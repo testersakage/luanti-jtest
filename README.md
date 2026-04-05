@@ -22,11 +22,9 @@ C++ 側に Unicode グリフ API を追加し、Mineclonia での日本語表示
 
 ## 📁 リポジトリ構成
 
-- `README.md` — このフォークの説明（あなたの README）
-- `README.upstream.md` — 本家 Luanti の README（そのまま保存）
+- `README.md` — このフォークの説明
+- `README.upstream.md` — 本家 Luanti の README
 - `src/` — Luanti C++ コード（Unicode API を追加）
-- `games/` — 使用しない（Mineclonia は外部フォルダで管理）
-- `textures/` — Unicode グリフ PNG を配置予定
 
 ---
 
@@ -56,7 +54,7 @@ Minecraft のように **看板に日本語を表示できる環境**を Luanti 
 ## 🧪 動作確認環境
 
 - Luanti（このフォーク）
-- Mineclonia（corburg 版を別フォルダに clone）
+- Mineclonia（corburg 版を別フォルダに clone）https://github.com/testersakage/mineclonia-jtest
 
 ---
 
