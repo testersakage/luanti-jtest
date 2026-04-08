@@ -17,6 +17,16 @@
 #include <vector>
 #include <unordered_map>
 
+/*--------------------------------------------------------------
+ * ImageRGBA
+ *   - Atlas PNG 読み込み & 12×12 glyph 切り出し用
+ *--------------------------------------------------------------*/
+struct ImageRGBA {
+    int width;
+    int height;
+    std::vector<unsigned char> data; // RGBA
+};
+
 class ClientUnicode
 {
 public:
@@ -71,13 +81,32 @@ public:
     int getAtlasGlyphIndex(uint32_t cp) const;
     int getTTFGlyphIndex(uint32_t cp) const;
 
+    /*--------------------------------------------------------------
+     * Atlas glyph extraction (client-side only)
+     *--------------------------------------------------------------*/
+
+    // glyph index → 12×12 RGBA image
+    ImageRGBA getAtlasGlyphImage(int glyph_index) const;
+
 private:
     // Internal lookup helpers
     int lookupAtlasGlyph(uint32_t cp) const;
     int lookupTTFGlyph(uint32_t cp) const;
 
+    /*--------------------------------------------------------------
+     * Atlas PNG loading (client-side only)
+     *--------------------------------------------------------------*/
+
+    const ImageRGBA &loadAtlasPage(int page);
+
     // Mapping tables
-    std::unordered_map<uint32_t, int> m_cjk_atlas_map; // 12x12 bitmap font
+    std::unordered_map<uint32_t, std::pair<int,int>> m_cjk_atlas_map;  // 12x12 bitmap font
     std::unordered_map<uint32_t, int> m_unicode_map;   // TTF / FreeType (future)
+
+    /*--------------------------------------------------------------
+     * Atlas page cache (page → ImageRGBA)
+     *--------------------------------------------------------------*/
+    std::unordered_map<int, ImageRGBA> m_atlas_pages;
+
 };
 

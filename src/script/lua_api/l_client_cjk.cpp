@@ -4,18 +4,28 @@
  */
 
 #include "l_client_cjk.h"
+#include "lua_api/l_internal.h"  // ★ API_FCT マクロの定義
+#include "lua_api/l_base.h"  // API_FCT マクロ
 #include "client/client.h"
 #include "client/client_unicode.h"
 
-// Register functions to Lua
-void ModApiClientCJK::Initialize(lua_State *L)
+/*
+ * Register functions to Lua (client-side)
+ */
+void ModApiClientCJK::InitializeClient(lua_State *L, int top)
 {
-    // Register Lua functions
+    // client.unicode テーブルを作成
+    lua_newtable(L);
+
+    // このテーブルに関数を登録する
     API_FCT(text_to_atlas_glyphs);
     API_FCT(text_to_glyphs);
     API_FCT(utf8_to_codepoints);
     API_FCT(codepoints_to_atlas_glyphs);
     API_FCT(codepoints_to_glyphs);
+
+    // client.unicode として Lua に登録
+    lua_setfield(L, top, "unicode");
 }
 
 /*--------------------------------------------------------------
@@ -49,7 +59,6 @@ int ModApiClientCJK::l_text_to_atlas_glyphs(lua_State *L)
     return 1; // テーブルを返す
 }
 
-
 int ModApiClientCJK::l_text_to_glyphs(lua_State *L)
 {
     // TODO: implement
@@ -77,7 +86,6 @@ int ModApiClientCJK::l_utf8_to_codepoints(lua_State *L)
     return 1;
 }
 
-
 int ModApiClientCJK::l_codepoints_to_atlas_glyphs(lua_State *L)
 {
     // 引数は Lua テーブル
@@ -91,7 +99,7 @@ int ModApiClientCJK::l_codepoints_to_atlas_glyphs(lua_State *L)
 
     // Lua テーブル → std::vector<uint32_t>
     std::vector<uint32_t> cps;
-    size_t len = lua_rawlen(L, 1);
+    size_t len = lua_objlen(L, 1);
     for (size_t i = 1; i <= len; i++) {
         lua_rawgeti(L, 1, i);
         uint32_t cp = luaL_checkinteger(L, -1);
@@ -113,3 +121,8 @@ int ModApiClientCJK::l_codepoints_to_atlas_glyphs(lua_State *L)
     return 1;
 }
 
+int ModApiClientCJK::l_codepoints_to_glyphs(lua_State *L)
+{
+    // TODO: implement
+    return 0;
+}
