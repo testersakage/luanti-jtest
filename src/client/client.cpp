@@ -358,6 +358,18 @@ const std::string &Client::getClientModsLuaPath()
 	return clientmods_dir;
 }
 
+// Unicode / CJK access
+ClientUnicode &Client::getUnicode()
+{
+	return m_unicode;
+}
+
+const ClientUnicode &Client::getUnicode() const
+{
+	return m_unicode;
+}
+
+
 const std::vector<ModSpec>& Client::getMods() const
 {
 	static std::vector<ModSpec> client_modspec_temp;
