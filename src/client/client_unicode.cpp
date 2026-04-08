@@ -19,7 +19,7 @@ bool ClientUnicode::loadUnicodeMap(const std::string &path)
 /*--------------------------------------------------------------
  * UTF-8 decoding
  *--------------------------------------------------------------*/
-std::vector<uint32_t> ClientUnicode::utf8ToCodepoints(const std::string &text)
+std::vector<uint32_t> ClientUnicode::utf8ToCodepoints(const std::string &text) const
 {
     std::vector<uint32_t> out;
     const unsigned char *s = (const unsigned char *)text.data();
