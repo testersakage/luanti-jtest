@@ -3,6 +3,7 @@
 // Copyright (C) 2013 celeron55, Perttu Ahola <celeron55@gmail.com>
 
 #include "lua_api/l_util.h"
+#include "lua_api/l_unicode.h"	// 追加
 #include "lua_api/l_internal.h"
 #include "lua_api/l_settings.h"
 #include "common/c_converter.h"
@@ -787,6 +788,9 @@ void ModApiUtil::Initialize(lua_State *L, int top)
 
 	LuaSettings::create(L, g_settings, g_settings_path);
 	lua_setfield(L, top, "settings");
+
+	// ★ 新しい Unicode API を登録
+	ModApiUnicode::Initialize(L, top);	
 }
 
 void ModApiUtil::InitializeClient(lua_State *L, int top)
