@@ -488,6 +488,8 @@ set(common_SRCS
 	${common_server_SRCS}
 	${mapgen_SRCS}
 	${server_network_SRCS}
+
+	cjk_common.cpp
 )
 
 if(ANDROID)

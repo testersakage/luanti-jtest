@@ -49,6 +49,7 @@ public:
      *--------------------------------------------------------------*/
 
     // UTF-8 → Unicode codepoints
+    // （実装は cjk_common に委譲）
     std::vector<uint32_t> utf8ToCodepoints(const std::string &text) const;
 
     /*--------------------------------------------------------------
@@ -107,6 +108,4 @@ private:
      * Atlas page cache (page → ImageRGBA)
      *--------------------------------------------------------------*/
     std::unordered_map<int, ImageRGBA> m_atlas_pages;
-
 };
-

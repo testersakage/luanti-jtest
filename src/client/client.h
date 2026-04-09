@@ -442,10 +442,11 @@ public:
 
 	bool inhibit_inventory_revert = false;
 
-	// Unicode / CJK 処理へのアクセス
+		// Unicode / CJK 処理へのアクセス
 	ClientUnicode &getUnicode() { return m_unicode; }
 	const ClientUnicode &getUnicode() const { return m_unicode; }
 
+	
 private:
 	struct PendingMediaDownload {
 		// Tokens to ack to the server. multiple because server can send duplicate

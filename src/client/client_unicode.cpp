@@ -8,6 +8,8 @@
 #include <fstream>
 #include <stdexcept>
 
+#include "cjk_common.h"  // ★ UTF-8 / Unicode 共通ロジック
+
 /*--------------------------------------------------------------
  * Loading mapping files
  *--------------------------------------------------------------*/
@@ -45,48 +47,8 @@ bool ClientUnicode::loadUnicodeMap(const std::string &path)
  *--------------------------------------------------------------*/
 std::vector<uint32_t> ClientUnicode::utf8ToCodepoints(const std::string &text) const
 {
-    std::vector<uint32_t> out;
-    const unsigned char *s = (const unsigned char *)text.data();
-    size_t len = text.size();
-    size_t i = 0;
-
-    while (i < len) {
-        uint32_t cp = 0;
-        unsigned char c = s[i];
-
-        if (c < 0x80) {
-            cp = c;
-            i += 1;
-        }
-        else if ((c >> 5) == 0x6) {
-            if (i + 1 >= len) break;
-            cp = ((c & 0x1F) << 6) | (s[i+1] & 0x3F);
-            i += 2;
-        }
-        else if ((c >> 4) == 0xE) {
-            if (i + 2 >= len) break;
-            cp = ((c & 0x0F) << 12) |
-                 ((s[i+1] & 0x3F) << 6) |
-                 (s[i+2] & 0x3F);
-            i += 3;
-        }
-        else if ((c >> 3) == 0x1E) {
-            if (i + 3 >= len) break;
-            cp = ((c & 0x07) << 18) |
-                 ((s[i+1] & 0x3F) << 12) |
-                 ((s[i+2] & 0x3F) << 6) |
-                 (s[i+3] & 0x3F);
-            i += 4;
-        }
-        else {
-            cp = 0xFFFD;
-            i += 1;
-        }
-
-        out.push_back(cp);
-    }
-
-    return out;
+    // ★ 旧実装を廃止し、cjk_common の UTF-8 デコードを使用
+    return cjk::utf8_to_codepoints(text);
 }
 
 /*--------------------------------------------------------------

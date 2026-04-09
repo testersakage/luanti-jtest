@@ -17,12 +17,18 @@ void ModApiClientCJK::InitializeClient(lua_State *L, int top)
     // client.unicode テーブルを作成
     lua_newtable(L);
 
-    // このテーブルに関数を登録する
-    API_FCT(text_to_atlas_glyphs);
-    API_FCT(text_to_glyphs);
-    API_FCT(utf8_to_codepoints);
-    API_FCT(codepoints_to_atlas_glyphs);
-    API_FCT(codepoints_to_glyphs);
+    // 関数一覧
+    luaL_Reg reg[] = {
+        {"text_to_atlas_glyphs", l_text_to_atlas_glyphs},
+        {"text_to_glyphs",       l_text_to_glyphs},
+        {"utf8_to_codepoints",   l_utf8_to_codepoints},
+        {"codepoints_to_atlas_glyphs", l_codepoints_to_atlas_glyphs},
+        {"codepoints_to_glyphs", l_codepoints_to_glyphs},
+        {NULL, NULL},
+    };
+
+    // テーブルに関数を登録
+    luaL_setfuncs(L, reg, 0);
 
     // client.unicode として Lua に登録
     lua_setfield(L, top, "unicode");
