@@ -14,6 +14,7 @@
 #include "log.h"
 #include "filesys.h"
 #include "porting.h"
+#include "lua_api/l_utf8_53_server.h" // utf8追加
 
 extern "C" {
 #include "lualib.h"
@@ -58,6 +59,9 @@ void MainMenuScripting::initializeModApi(lua_State *L, int top)
 	ModApiUtil::Initialize(L, top);
 	ModApiMainMenuSound::Initialize(L, top);
 	ModApiHttp::Initialize(L, top);
+	
+	// Unicode API を追加
+	LuaUTF8::Initialize(L, top);
 
 	asyncEngine.registerStateInitializer(registerLuaClasses);
 	asyncEngine.registerStateInitializer(ModApiMenuCommon::InitializeAsync);

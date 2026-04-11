@@ -24,7 +24,7 @@ set(common_SCRIPT_LUA_API_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/l_playermeta.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_rollback.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_server.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/l_server_cjk.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_utf8_53_server.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_settings.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_storage.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_util.cpp
@@ -36,7 +36,6 @@ set(client_SCRIPT_LUA_API_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/l_client.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_client_common.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_client_sound.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/l_client_cjk.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_localplayer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_mainmenu.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_mainmenu_sound.cpp

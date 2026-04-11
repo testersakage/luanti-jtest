@@ -15,7 +15,7 @@
 #include "util/numeric.h"
 #include "util/string.h" // StringMap
 
-#include "client_unicode.h"  // ★ 追加
+//#include "client_unicode.h"  // ★ 追加
 
 #include <map>
 #include <memory>
@@ -443,10 +443,9 @@ public:
 	bool inhibit_inventory_revert = false;
 
 		// Unicode / CJK 処理へのアクセス
-	ClientUnicode &getUnicode() { return m_unicode; }
-	const ClientUnicode &getUnicode() const { return m_unicode; }
+//	ClientUnicode &getUnicode() { return m_unicode; }
+//	const ClientUnicode &getUnicode() const { return m_unicode; }
 
-	
 private:
 	struct PendingMediaDownload {
 		// Tokens to ack to the server. multiple because server can send duplicate
@@ -616,6 +615,6 @@ private:
 	MeshGrid m_mesh_grid;
 
 	// Unicode / CJK 処理（Atlas + TTF）
-	ClientUnicode m_unicode;  // ★ 追加
+//	ClientUnicode m_unicode;  // ★ 追加
 
 };

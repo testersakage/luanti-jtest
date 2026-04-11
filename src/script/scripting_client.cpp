@@ -22,7 +22,7 @@
 #include "lua_api/l_camera.h"
 #include "lua_api/l_settings.h"
 #include "lua_api/l_client_sound.h"
-#include "lua_api/l_client_cjk.h"  // ★追加：CJK API のヘッダ
+//#include "lua_api/l_client_cjk.h"  // ★追加：CJK API のヘッダ
 
 ClientScripting::ClientScripting(Client *client):
     ScriptApiBase(ScriptingType::Client)
@@ -74,7 +74,7 @@ void ClientScripting::InitializeModApi(lua_State *L, int top)
     ModApiParticlesLocal::Initialize(L, top);
     ModApiClientSound::Initialize(L, top);
 
-    ModApiClientCJK::InitializeClient(L, top);  // ★ここに追加
+//    ModApiClientCJK::InitializeClient(L, top);  // ★ここに追加
 }
 
 void ClientScripting::on_client_ready(LocalPlayer *localplayer)

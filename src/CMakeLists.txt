@@ -489,7 +489,7 @@ set(common_SRCS
 	${mapgen_SRCS}
 	${server_network_SRCS}
 
-	cjk_common.cpp
+	utf8_53.cpp
 )
 
 if(ANDROID)
