@@ -23,22 +23,47 @@ static size_t get_pos_arg(lua_State *L, int arg_idx, size_t len, size_t default_
 }
 
 // --- 補助関数: utf8.codes 用のイテレータ本体 ---
+/**
+ * Luaからの呼び出し形式: next_pos, code = iter(s, last_next_pos)
+ */
 static int iter_codes(lua_State *L)
 {
+    // 第1引数: 対象の文字列
     size_t len;
     const char *s_ptr = luaL_checklstring(L, 1, &len);
-    std::string s(s_ptr, len);
-    size_t pos = (size_t)lua_tointeger(L, 2); // 前回の終了位置（0始まり）
+    
+    // 第2引数: 前回の呼び出しで返した「次の開始位置」(0始まり)
+    // 初回は Initialize で設定した 0 が入る
+    size_t next_pos = (size_t)lua_tointeger(L, 2);
+
+    // 文字列の終端に達していたら nil を返して終了
+    if (next_pos >= len) {
+        return 0;
+    }
 
     int code_point;
-    if (utf8_53::get_next_char(s, pos, code_point)) {
-        // 次の開始位置(Luaは1始まりなので+1不要、posが既に次を指している)
-        lua_pushinteger(L, pos); 
-        lua_pushinteger(L, code_point);
-        return 2;
+    size_t current_pos = next_pos; // 今回の文字の開始位置を記録
+
+    // get_next_char で next_pos を次の文字の先頭へ進める
+    // 文字列のコピーを避けるため std::string_view 的な扱いで呼び出し
+    std::string s(s_ptr, len); 
+    if (utf8_53::get_next_char(s, next_pos, code_point)) {
+        
+        // 戻り値1: 次回の呼び出し時に第2引数として渡される値 (内部状態: 次の位置)
+        lua_pushinteger(L, (lua_Integer)next_pos);
+        
+        // 戻り値2: Lua側の for i, code ... の 「i」 に入る値 (現在の位置: 1始まり)
+        lua_pushinteger(L, (lua_Integer)current_pos + 1);
+        
+        // 戻り値3: Lua側の for i, code ... の 「code」 に入る値
+        lua_pushinteger(L, (lua_Integer)code_point);
+        
+        // 合計3つの値を返す
+        return 3;
     }
     
-    return 0; // 終了
+    // 解析に失敗した場合も終了
+    return 0;
 }
 
 // --- Lua API 実装 ---
