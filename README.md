@@ -7,9 +7,16 @@ C++ 側に Unicode グリフ API を追加し、Mineclonia での日本語表示
 
 ## 🔧 このフォークで行っている主な変更
 
+<<<<<<< Updated upstream
 - Unicode グリフを扱うための C++ API の追加  
 - Lua 側で UTF-8 → Unicode コードポイント変換を行う前提での API 設計  
 - Unicode グリフ PNG（12×12）を利用したテクスチャ生成の準備
+=======
+- C++ 側で UTF-8 → Unicode コードポイント変換を行う前提での API 設計  
+- Unicode グリフを扱うための C++ API の追加  
+- Unicode グリフ PNG（12×12）を利用したテクスチャ生成の準備
+- Lua 側で処理していたテクスチャ生成に関する処理をクライアント側へ変更
+>>>>>>> Stashed changes
 
 ---
 
@@ -60,4 +67,8 @@ Minecraft のように **看板に日本語を表示できる環境**を Luanti 
 
 ## 📝 補足
 
+<<<<<<< Updated upstream
 - コード生成に Copilot を利用しています。
+=======
+- コード生成に Copilot, Gemini を利用しています。
+>>>>>>> Stashed changes
