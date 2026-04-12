@@ -3,6 +3,7 @@
 
 // これを追加！
 #include "../../utf8_53.h" 
+#include "irrlichttypes.h"
 
 // utf8.font_width(text)
 int LuaUTF8Font::l_utf8_font_width(lua_State *L)
