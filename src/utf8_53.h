@@ -12,15 +12,29 @@ namespace utf8_53 {
     // 戻り値: 文字数。不正なバイトがあれば -1 とその位置を返す
     int count_chars(const std::string &s, size_t i, size_t j, size_t &err_pos);
 
-    // コードポイントを UTF-8 バイト列に変換して追加
+    // 【Pack】コードポイントを UTF-8 バイト列に変換して追加 (lua utf8.char 相当)
     void push_char(std::string &res, int code_point);
 
-    // Unicode EAW (East Asian Width) 
+    // 【Unpack】文字列をコードポイントの配列に分解
+    std::vector<int> to_codepoints(const std::string &s);
 
-    // 【追加】コードポイントの幅を返す (1 or 2)
+    // --- Unicode EAW (East Asian Width) & Layout Logic ---
+
+    // コードポイントの論理幅を返す (半角=1, 全角=2)
     int get_char_width(int cp);
 
-    // 【追加】文字列全体の表示幅を合計して返す
+    // 文字列全体の論理幅の合計を返す (lua utf8.width 相当)
     int get_string_width(const std::string &s);
 
-}
+    // --- Modern Signboard Logic (12px Atlas Specification) ---
+
+    // 看板上の物理表示幅(pixel)を計算する (半角=6px, 全角=12px)
+    int get_total_pixel_width(const std::string &s);
+
+    // 指定した物理幅(pixel)に収まるように安全にカットする
+    std::string truncate_to_pixel_width(const std::string &s, int max_px);
+
+	    // 指定した物理幅(pixel)で自動改行し、行ごとのリストを返す
+    std::vector<std::string> get_lines(const std::string &s, int max_px);
+
+} // namespace utf8_53

@@ -3,7 +3,7 @@
 
 namespace utf8_53 {
 
-// 1. 次のUTF-8文字を解析するコアロジック
+//  次のUTF-8文字を解析するコアロジック
 bool get_next_char(const std::string &s, size_t &pos, int &code_point) {
     if (pos >= s.length()) return false;
 
@@ -39,7 +39,7 @@ bool get_next_char(const std::string &s, size_t &pos, int &code_point) {
     return true;
 }
 
-// 2. utf8.len(s, i, j) 用のカウント
+//  utf8.len(s, i, j) 用のカウント
 int count_chars(const std::string &s, size_t i, size_t j, size_t &err_pos) {
     int count = 0;
     size_t pos = i;
@@ -55,7 +55,7 @@ int count_chars(const std::string &s, size_t i, size_t j, size_t &err_pos) {
     return count;
 }
 
-// 3. utf8.char(...) 用の変換
+//  utf8.char(...) 用の変換
 void push_char(std::string &res, int cp) {
     if (cp < 0x80) {
         res += (char)cp;
@@ -77,10 +77,10 @@ void push_char(std::string &res, int cp) {
     // Unicode EAW (East Asian Width) 
 
 int get_char_width(int cp) {
-    // 1. ASCII と制御文字、ラテン文字などは 1列
+    //  ASCII と制御文字、ラテン文字などは 1列
     if (cp < 0x1100) return 1;
 
-    // 2. CJK全角文字の主要範囲
+    //  CJK全角文字の主要範囲
     if ((cp >= 0x1100 && cp <= 0x11FF) || // ハングル
         (cp >= 0x2329 && cp <= 0x232A) || // 〈 〉
         (cp >= 0x2E80 && cp <= 0x2FDF) || // 部首
@@ -117,6 +117,82 @@ int get_string_width(const std::string &s) {
         total_width += get_char_width(cp);
     }
     return total_width;
+}
+
+	// 以下、逆変換関数
+
+//  push_char の逆：文字列をコードポイントの配列(vector)に分解する
+std::vector<int> to_codepoints(const std::string &s) {
+    std::vector<int> res;
+    size_t pos = 0;
+    int cp;
+    // 既存の get_next_char を活用
+    while (get_next_char(s, pos, cp)) {
+        res.push_back(cp);
+    }
+    return res;
+}
+
+	// 以下、ラッパー関数
+
+//  看板の物理幅（ピクセル）を計算する
+// 12pxアトラス仕様：半角=6px / 全角=12px と判定
+int get_total_pixel_width(const std::string &s) {
+    int total_px = 0;
+    size_t pos = 0;
+    int cp;
+    while (get_next_char(s, pos, cp)) {
+        // get_char_width(cp) が 1なら6px、2なら12px
+        total_px += (get_char_width(cp) == 2 ? 12 : 6);
+    }
+    return total_px;
+}
+
+//  指定したピクセル幅に収まるように安全にカットする
+std::string truncate_to_pixel_width(const std::string &s, int max_px) {
+    std::string res = "";
+    int current_px = 0;
+    size_t pos = 0;
+    int cp;
+    
+    while (pos < s.length()) {
+        size_t last_pos = pos; // 現在の読み取り開始位置を保存
+        if (!get_next_char(s, pos, cp)) break;
+
+        int w = (get_char_width(cp) == 2 ? 12 : 6);
+        if (current_px + w > max_px) break;
+
+        // get_next_char で進んだ分（pos - last_pos）を切り出して追加
+        res.append(s.substr(last_pos, pos - last_pos));
+        current_px += w;
+    }
+    return res;
+}
+
+//  文字列を指定範囲で切り出す＋自動改行
+std::vector<std::string> get_lines(const std::string &s, int max_px) {
+    std::vector<std::string> lines;
+    std::string remaining = s;
+
+    while (!remaining.empty()) {
+        // 現在の行に収まる分を切り出す
+        std::string line = truncate_to_pixel_width(remaining, max_px);
+        
+        if (line.empty()) {
+            // 1文字も入らない（1文字がmax_pxより大きい）場合は、強制的に1文字出す
+            size_t pos = 0;
+            int cp;
+            if (get_next_char(remaining, pos, cp)) {
+                line = remaining.substr(0, pos);
+            } else {
+                break; // 異常系
+            }
+        }
+        
+        lines.push_back(line);
+        remaining = remaining.substr(line.length());
+    }
+    return lines;
 }
 
 } // namespace utf8_53
