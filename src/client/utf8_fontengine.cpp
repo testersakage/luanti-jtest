@@ -5,6 +5,7 @@
 
 // 1. Irrlichtの型を使うための「親玉」を一番上に持ってくる
 #include "irrlichttypes.h" 
+#include "utf8_fontatlas.h"
 #include "utf8_fontengine.h"
 
 #include "fontengine.h"       // g_fontengine にアクセスするため
@@ -25,6 +26,9 @@
 #include <sstream> // これを忘れずに！
 #include <vector>
 #include <string>
+
+// ★ staticメンバの実体を定義
+UTF8FontAtlas* UTF8FontEngine::m_atlas = nullptr;
 
 /**
  * 補足:
@@ -185,40 +189,67 @@ void* UTF8FontEngine::getGlyphImage(wchar_t c)
 // 関数 UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 {
+	// ★ 倉庫がまだ無ければ、初回呼び出し時に1つだけ作る
+	if (!m_atlas) {
+		m_atlas = new UTF8FontAtlas();
+	}
+
 	if (!dest_img_ptr) return;
 	video::IImage *dest_img = reinterpret_cast<video::IImage*>(dest_img_ptr);
 
-	// 1. 看板キャンバスの初期化（全透明）
+	//  看板キャンバスの初期化（全透明）
 	dest_img->fill(video::SColor(0, 0, 0, 0));
 
-	// 2. [utf8combine:115x115: 以降の生テキストを抽出
+	//  [utf8combine:115x115: 以降の生テキストを抽出
 	size_t last_colon = command.find_last_of(':');
 	if (last_colon == std::string::npos) return;
 	std::string raw_text = command.substr(last_colon + 1);
 	if (raw_text.empty()) return;
 
-	// 3. Luaのお手本通りに改行リストを生成（幅100px制限）
+	//  Luaのお手本通りに改行リストを生成（幅100px制限）
 	std::vector<std::string> lines = UTF8FontEngine::generateLines(raw_text, 114);
 
-	// 4. 描画位置の黄金比設定 (y=2pxから開始、13pxステップ)
+	//  描画位置の黄金比設定 (y=2pxから開始、13pxステップ)
 	u32 y_cursor = 2;
 	for (const std::string &line_str : lines) {
 		std::wstring wline = utf8_to_wide(line_str);
 		u32 x_cursor = 16; // 左端の余白
 
-		for (wchar_t c : wline) {
-			video::IImage* glyph = (video::IImage*)UTF8FontEngine::getGlyphImage(c);
-			if (glyph) {
-				// 看板キャンバスへスタンプ
-				glyph->copyTo(dest_img, core::position2d<s32>(x_cursor, y_cursor));
-				x_cursor += glyph->getDimension().Width;
-				glyph->drop();
+		//  行をコードポイントの配列に分解（アンパッキング）
+		std::vector<int> cps = utf8_53::to_codepoints(line_str);
+
+		for (int cp : cps) {
+			u32 current_w = 12; // デフォルト（失敗時の保険）
+			try {
+				// 「倉庫」からグリフを借りる（ここで半角ならwidth=6、全角なら12が返る）
+				ImageRGBA glyph = m_atlas->getGlyphImage(cp);
+				current_w = glyph.width; // 実際の幅を保持
+
+				// スタンプ処理：幅は glyph.width を使うように修正
+				for (int gy = 0; gy < 12; gy++) {
+					for (int gx = 0; gx < (int)glyph.width; gx++) {
+						int i = (gy * glyph.width + gx) * 4;
+						video::SColor color(
+							glyph.data[i + 3], // Alpha
+							glyph.data[i + 0], // Red
+							glyph.data[i + 1], // Green
+							glyph.data[i + 2]  // Blue
+						);
+						if (color.getAlpha() > 0) {
+							dest_img->setPixel(x_cursor + gx, y_cursor + gy, color);
+						}
+					}
+				}
+			} catch (...) {
+				// 失敗しても current_w 分だけは進める（文字化け箇所を空白にする）
 			}
+			
+			// 進める量は、借りてきた画像の幅に準拠
+			x_cursor += current_w; 
+			if (x_cursor > 130) break; 
 		}
-		// 次の行へ移動。看板の高さを考慮して一定位置で打ち切り
-		y_cursor += 13; 
-		if (y_cursor > 54) break; 
+		y_cursor += 13; // 13pxステップ
+		if (y_cursor > 54) break;
 	}
 }
-
  

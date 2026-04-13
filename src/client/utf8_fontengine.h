@@ -6,6 +6,9 @@
 #include <string>
 #include <vector>
 
+// ★ ここに「前方宣言」を追加
+class UTF8FontAtlas; 
+
 class UTF8FontEngine {
 public:
 	/**
@@ -44,6 +47,6 @@ public:
 	static void* getGlyphImage(wchar_t c);
 
 private:
-	// インスタンス化させないためのプライベートコンストラクタ
-	UTF8FontEngine() {}
+	// ★ ここに「倉庫番」を配属します
+	static UTF8FontAtlas *m_atlas; 
 };
