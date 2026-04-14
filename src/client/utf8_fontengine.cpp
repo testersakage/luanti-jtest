@@ -193,77 +193,81 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 	if (!dest_img_ptr) return;
 	video::IImage *dest_img = reinterpret_cast<video::IImage*>(dest_img_ptr);
 
-	//  引数のパース (115x115, 16,2=Text)
-	size_t first_colon = command.find(':');
-	if (first_colon == std::string::npos) return;
-	std::string params = command.substr(first_colon + 1);
+	// --- 1. 終端チェックと外枠剥離 ---
+	// 最後に ']' があることを前提に、その手前までを解析対象とする
+	if (command.empty() || command.front() != '[' || command.back() != ']') {
+		// 構文エラーをチャット/ログに通知
+		actionstream << "UTF8FontEngine: Syntax Error (Missing []): " << command << std::endl;
+		return;
+	}
 
-	// 引数の取得
-	u32 canvas_w = 1, canvas_h = 1;
-	size_t x_pos = params.find('x');
-	size_t second_colon = params.find(':');
-	if (x_pos != std::string::npos && x_pos < second_colon) {
-		canvas_w = mystoi(params.substr(0, x_pos));
-		canvas_h = mystoi(params.substr(x_pos + 1, second_colon - x_pos - 1));
+	// [ ] を取り除いた中身: "utf8combine:115x115:15,2@RRGGBB=Text"
+	std::string inner = command.substr(1, command.length() - 2);
+
+	// --- 2. 大ブロックの分離 (コロンによる分割) ---
+	size_t first_colon = inner.find(':');
+	size_t second_colon = inner.find(':', first_colon + 1);
+
+	if (first_colon == std::string::npos || second_colon == std::string::npos) {
+		actionstream << "UTF8FontEngine: Syntax Error (Missing colons): " << command << std::endl;
+		return;
+	}
+
+	// 各ブロックの抽出
+	std::string size_part = inner.substr(first_colon + 1, second_colon - first_colon - 1); // "115x115"
+	std::string content_part = inner.substr(second_colon + 1); // "15,2@RRGGBB=Text"
+
+	// --- 3. 詳細パース：キャンバスサイズ ---
+	u32 canvas_w = 115, canvas_h = 115;
+	size_t x_pos = size_part.find('x');
+	if (x_pos != std::string::npos) {
+		canvas_w = mystoi(size_part.substr(0, x_pos));
+		canvas_h = mystoi(size_part.substr(x_pos + 1));
 	}
 
 	// キャンバスの初期化
 	dest_img->fill(video::SColor(0, 0, 0, 0));
 
-	std::string content = params.substr(second_colon + 1);
-	size_t comma = content.find(',');
-	size_t equal = content.find('=');
-	// ★ ここで定義！
-	size_t at_sign = content.find('@');
+	// --- 4. 詳細パース：座標・色・テキスト ---
+	size_t equal = content_part.find('=');
+	if (equal == std::string::npos) {
+		actionstream << "UTF8FontEngine: Syntax Error (Missing '='): " << command << std::endl;
+		return;
+	}
+
+	std::string settings = content_part.substr(0, equal);
+	std::string raw_text = content_part.substr(equal + 1); // ここで純粋な「中身」が確定
 
 	u32 start_x = 15, start_y = 2;
-	// ★ デフォルト色は白 (255,255,255,255) にしておきます
-	video::SColor target_color(255, 255, 255, 255);
-	std::string raw_text;
+	video::SColor target_color(255, 255, 255, 255); // デフォルト白
+	size_t at_sign = settings.find('@');
+	size_t comma = settings.find(',');
 
 	// カラーコード (@RRGGBB) の解析
-	if (at_sign != std::string::npos && at_sign < equal) {
-		// 座標の解析
-		std::string coord_part = content.substr(0, at_sign);
-		size_t comma = coord_part.find(',');
-		if (comma != std::string::npos) {
-			start_x = mystoi(coord_part.substr(0, comma));
-			start_y = mystoi(coord_part.substr(comma + 1));
-		}
-
-		// ★ 色の解析
-		std::string hex_str = content.substr(at_sign + 1, equal - at_sign - 1);
-		u32 color_int = 0;
+	if (at_sign != std::string::npos) {
+		std::string hex_str = settings.substr(at_sign + 1);
 		try {
-
-			// std::stoul で 16進数としてパース (第3引数に 16 を指定)
 			unsigned long color_val = std::stoul(hex_str, nullptr, 16);
 			target_color = video::SColor(255, 
 				(color_val >> 16) & 0xFF, 
 				(color_val >> 8) & 0xFF, 
-				color_val & 0xFF);			
-			// std::stoul ではなく、より安全な 16進数パース
-
+				color_val & 0xFF);
 		} catch (...) {
-			target_color = video::SColor(255, 255, 255, 255); // 失敗時は白
-		}
-
-		raw_text = content.substr(equal + 1);
-	} else {
-		// @ がない場合の従来パース
-		if (equal != std::string::npos) {
-			size_t comma = content.find(',');
-			start_x = mystoi(content.substr(0, comma));
-			start_y = mystoi(content.substr(comma + 1, equal - comma - 1));
-
-			raw_text = content.substr(equal + 1);
-		} else {
-			warningstream << "[utf8_debug] no @ detected, using default color." << std::endl;
-			raw_text = content;
+			target_color = video::SColor(255, 255, 255, 255);
 		}
 	}
 
+	// 座標の解析
+	if (comma != std::string::npos) {
+		start_x = mystoi(settings.substr(0, comma));
+		// Y座標はカンマから「@」の手前まで、または末尾まで
+		size_t y_end = (at_sign != std::string::npos) ? at_sign : settings.length();
+		start_y = mystoi(settings.substr(comma + 1, y_end - (comma + 1)));
+	}
+
 	if (raw_text.empty()) return;
+	// renderUtf8Combine 内、raw_text 確定直後
+	warningstream << "[utf8_debug] text_size: " << raw_text.length() << " first_char: " << (int)raw_text[0] << std::endl;
 
 	// 2. 動的な改行幅の計算
 	int wrap_width = canvas_w - (start_x * 2); 
