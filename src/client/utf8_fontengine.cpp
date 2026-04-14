@@ -189,67 +189,129 @@ void* UTF8FontEngine::getGlyphImage(wchar_t c)
 // 関数 UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 {
-	// ★ 倉庫がまだ無ければ、初回呼び出し時に1つだけ作る
-	if (!m_atlas) {
-		m_atlas = new UTF8FontAtlas();
-	}
-
+	if (!m_atlas) m_atlas = new UTF8FontAtlas();
 	if (!dest_img_ptr) return;
 	video::IImage *dest_img = reinterpret_cast<video::IImage*>(dest_img_ptr);
 
-	//  看板キャンバスの初期化（全透明）
+	//  引数のパース (115x115, 16,2=Text)
+	size_t first_colon = command.find(':');
+	if (first_colon == std::string::npos) return;
+	std::string params = command.substr(first_colon + 1);
+
+	// 引数の取得
+	u32 canvas_w = 1, canvas_h = 1;
+	size_t x_pos = params.find('x');
+	size_t second_colon = params.find(':');
+	if (x_pos != std::string::npos && x_pos < second_colon) {
+		canvas_w = mystoi(params.substr(0, x_pos));
+		canvas_h = mystoi(params.substr(x_pos + 1, second_colon - x_pos - 1));
+	}
+
+	// キャンバスの初期化
 	dest_img->fill(video::SColor(0, 0, 0, 0));
 
-	//  [utf8combine:115x115: 以降の生テキストを抽出
-	size_t last_colon = command.find_last_of(':');
-	if (last_colon == std::string::npos) return;
-	std::string raw_text = command.substr(last_colon + 1);
+	std::string content = params.substr(second_colon + 1);
+	size_t comma = content.find(',');
+	size_t equal = content.find('=');
+	// ★ ここで定義！
+	size_t at_sign = content.find('@');
+
+	u32 start_x = 15, start_y = 2;
+	// ★ デフォルト色は白 (255,255,255,255) にしておきます
+	video::SColor target_color(255, 255, 255, 255);
+	std::string raw_text;
+
+	// カラーコード (@RRGGBB) の解析
+	if (at_sign != std::string::npos && at_sign < equal) {
+		// 座標の解析
+		std::string coord_part = content.substr(0, at_sign);
+		size_t comma = coord_part.find(',');
+		if (comma != std::string::npos) {
+			start_x = mystoi(coord_part.substr(0, comma));
+			start_y = mystoi(coord_part.substr(comma + 1));
+		}
+
+		// ★ 色の解析
+		std::string hex_str = content.substr(at_sign + 1, equal - at_sign - 1);
+		u32 color_int = 0;
+		try {
+
+			// std::stoul で 16進数としてパース (第3引数に 16 を指定)
+			unsigned long color_val = std::stoul(hex_str, nullptr, 16);
+			target_color = video::SColor(255, 
+				(color_val >> 16) & 0xFF, 
+				(color_val >> 8) & 0xFF, 
+				color_val & 0xFF);			
+			// std::stoul ではなく、より安全な 16進数パース
+
+		} catch (...) {
+			target_color = video::SColor(255, 255, 255, 255); // 失敗時は白
+		}
+
+		raw_text = content.substr(equal + 1);
+	} else {
+		// @ がない場合の従来パース
+		if (equal != std::string::npos) {
+			size_t comma = content.find(',');
+			start_x = mystoi(content.substr(0, comma));
+			start_y = mystoi(content.substr(comma + 1, equal - comma - 1));
+
+			raw_text = content.substr(equal + 1);
+		} else {
+			warningstream << "[utf8_debug] no @ detected, using default color." << std::endl;
+			raw_text = content;
+		}
+	}
+
 	if (raw_text.empty()) return;
 
-	//  Luaのお手本通りに改行リストを生成（幅100px制限）
-	std::vector<std::string> lines = UTF8FontEngine::generateLines(raw_text, 114);
+	// 2. 動的な改行幅の計算
+	int wrap_width = canvas_w - (start_x * 2); 
+	if (wrap_width <= 0) wrap_width = canvas_w;
+	std::vector<std::string> lines = utf8_53::get_lines(raw_text, wrap_width);
 
-	//  描画位置の黄金比設定 (y=2pxから開始、13pxステップ)
-	u32 y_cursor = 2;
+	u32 y_cursor = start_y;
 	for (const std::string &line_str : lines) {
-		std::wstring wline = utf8_to_wide(line_str);
-		u32 x_cursor = 16; // 左端の余白
+		// ★ 行の処理に入る「直前」で、今から書く行がハミ出さないか厳格にチェック
+		if (y_cursor + 12 > canvas_h) break; 
 
-		//  行をコードポイントの配列に分解（アンパッキング）
+		u32 x_cursor = start_x;
 		std::vector<int> cps = utf8_53::to_codepoints(line_str);
 
 		for (int cp : cps) {
-			u32 current_w = 12; // デフォルト（失敗時の保険）
+			u32 current_w = 12; 
 			try {
-				// 「倉庫」からグリフを借りる（ここで半角ならwidth=6、全角なら12が返る）
 				ImageRGBA glyph = m_atlas->getGlyphImage(cp);
-				current_w = glyph.width; // 実際の幅を保持
+				// 右端ブレーキ：次の文字がキャンバスからはみ出すならその行は終了
+				if (x_cursor + glyph.width > canvas_w) break;
+				
+				current_w = glyph.width;
 
-				// スタンプ処理：幅は glyph.width を使うように修正
 				for (int gy = 0; gy < 12; gy++) {
 					for (int gx = 0; gx < (int)glyph.width; gx++) {
 						int i = (gy * glyph.width + gx) * 4;
-						video::SColor color(
-							glyph.data[i + 3], // Alpha
-							glyph.data[i + 0], // Red
-							glyph.data[i + 1], // Green
-							glyph.data[i + 2]  // Blue
-						);
-						if (color.getAlpha() > 0) {
-							dest_img->setPixel(x_cursor + gx, y_cursor + gy, color);
+						
+						// ★ ここで色を適用！
+						// アトラスから Alpha だけ抜き出し、色は target_color を使う
+						video::SColor pixel_color = target_color;
+						pixel_color.setAlpha(glyph.data[i + 3]); 
+
+						if (pixel_color.getAlpha() > 0) {
+							dest_img->setPixel(x_cursor + gx, y_cursor + gy, pixel_color);
 						}
 					}
 				}
-			} catch (...) {
-				// 失敗しても current_w 分だけは進める（文字化け箇所を空白にする）
-			}
+			} catch (...) {}
 			
-			// 進める量は、借りてきた画像の幅に準拠
+			// 文字を一つ書き終えたら、その幅分だけ右へ進める
 			x_cursor += current_w; 
-			if (x_cursor > 130) break; 
+			// ★ 130 固定を canvas_w に変更！
+			if (x_cursor >= canvas_w) break; 
 		}
-		y_cursor += 13; // 13pxステップ
-		if (y_cursor > 54) break;
+		
+		// 次の行へ（12px+1pxの余白 = 13px）
+		y_cursor += 13; 
+//		if (y_cursor + 12 > canvas_h) break; 
 	}
 }
  

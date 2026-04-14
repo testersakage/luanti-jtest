@@ -77,8 +77,11 @@ void push_char(std::string &res, int cp) {
     // Unicode EAW (East Asian Width) 
 
 int get_char_width(int cp) {
-    //  ASCII と制御文字、ラテン文字などは 1列
+    //  ASCII範囲 (0x00 - 0x7F) と 0xFF までの半角範囲は 1列(6px相当)
+    //  ラテン文字なども 1列
     if (cp < 0x1100) return 1;
+    // 2. 半角カタカナ範囲 (U+FF61 - U+FF9F) を「幅1」に指定
+    if (cp >= 0xFF61 && cp <= 0xFF9F) return 1;
 
     //  CJK全角文字の主要範囲
     if ((cp >= 0x1100 && cp <= 0x11FF) || // ハングル
