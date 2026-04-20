@@ -3,6 +3,7 @@
 このリポジトリは、Luanti のテキスト描画システムを Unicode（特に日本語および多言語）に完全対応させ、Minecraft と同等、あるいはそれ以上の描画品質を実現するためのフォークです。
 従来の Lua による低速な画像合成を廃止し、C++ エンジン側に直接「Unicode Glyph API」を実装することで、圧倒的なパフォーマンスと美しさを両立しています。
 ------------------------------
+<img width=600, height=225, src="https://github.com/testersakage/luanti-jtest/blob/master/screenshots/samplesign.png"></img>
 ## 🔧 このフォークの革新的な機能
 
 ## 1. 14px の聖域 (Precision Rendering)
