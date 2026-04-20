@@ -8,9 +8,10 @@
 #include "utf8_fontatlas.h"
 #include "utf8_fontengine.h"
 
-#include "fontengine.h"       // g_fontengine にアクセスするため
-#include "util/string.h"       // utf8_to_wide 用
-#include "../utf8_53.h"        // あなたが作った UTF-8 ロジック
+#include "fontengine.h"	   // g_fontengine にアクセスするため
+#include "util/string.h"	   // utf8_to_wide 用
+#include "../utf8_53.h"		// あなたが作った UTF-8 ロジック
+#include "../script/common/l_utf8sign.h"		// 追加
 
 #include <IVideoDriver.h> 
 #include <ITexture.h> 
@@ -41,12 +42,12 @@ UTF8FontAtlas* UTF8FontEngine::m_atlas = nullptr;
  
 u32 UTF8FontEngine::getTextWidth(const std::string &text)
 {
-    if (text.empty())
-        return 0;
+	if (text.empty())
+		return 0;
 
-    // getFont() が返す IGUIFont には getTextWidth はなく、
-    // getDimension で core::dimension2d<u32> を取得し、その Width を参照する
-    return g_fontengine->getFont()->getDimension(utf8_to_wide(text).c_str()).Width;
+	// getFont() が返す IGUIFont には getTextWidth はなく、
+	// getDimension で core::dimension2d<u32> を取得し、その Width を参照する
+	return g_fontengine->getFont()->getDimension(utf8_to_wide(text).c_str()).Width;
 }
 
 std::vector<std::string> UTF8FontEngine::wrapText(const std::string &text, u32 max_pixel_width)
@@ -131,60 +132,60 @@ std::string UTF8FontEngine::truncateText(const std::string &text, u32 max_pixel_
 //  関数 void* UTF8FontEngine::getGlyphImage(wchar_t c)
 void* UTF8FontEngine::getGlyphImage(wchar_t c)
 {
-    video::IVideoDriver* driver = RenderingEngine::get_video_driver();
-    gui::IGUIFont *font = g_fontengine->getFont(12); // 12px
-    if (!font) font = g_fontengine->getFont(); // 失敗したらデフォルトにフォールバック
-    if (!driver || !font) return nullptr;
+	video::IVideoDriver* driver = RenderingEngine::get_video_driver();
+	gui::IGUIFont *font = g_fontengine->getFont(12); // 12px
+	if (!font) font = g_fontengine->getFont(); // 失敗したらデフォルトにフォールバック
+	if (!driver || !font) return nullptr;
 
-    wchar_t temp_str[] = {c, 0};
-    core::dimension2du dim = font->getDimension(temp_str);
-    if (dim.Width == 0) return nullptr;
+	wchar_t temp_str[] = {c, 0};
+	core::dimension2du dim = font->getDimension(temp_str);
+	if (dim.Width == 0) return nullptr;
 
-    // 1. 文字を描くための「一時的なテクスチャ（VRAM上のキャンバス）」を作る
-    video::ITexture* render_tex = driver->addRenderTargetTexture(dim, "glyph_tmp_rt");
-    if (!render_tex) return nullptr;
+	// 1. 文字を描くための「一時的なテクスチャ（VRAM上のキャンバス）」を作る
+	video::ITexture* render_tex = driver->addRenderTargetTexture(dim, "glyph_tmp_rt");
+	if (!render_tex) return nullptr;
 
-    // 2. 描画先を画面から「このテクスチャ」へ切り替える
-    driver->setRenderTarget(render_tex, true, true, video::SColor(0,0,0,0));
+	// 2. 描画先を画面から「このテクスチャ」へ切り替える
+	driver->setRenderTarget(render_tex, true, true, video::SColor(0,0,0,0));
 
-    // 3. 描画命令！ (これでテクスチャに文字が書き込まれる)
-    font->draw(temp_str, core::rect<s32>(0, 0, dim.Width, dim.Height), 
-               video::SColor(255, 255, 255, 255));
+	// 3. 描画命令！ (これでテクスチャに文字が書き込まれる)
+	font->draw(temp_str, core::rect<s32>(0, 0, dim.Width, dim.Height), 
+			   video::SColor(255, 255, 255, 255));
 
-    // 4. 描画先を元（画面）に戻す
-    driver->setRenderTarget(nullptr);
+	// 4. 描画先を元（画面）に戻す
+	driver->setRenderTarget(nullptr);
 
-    // 5. 【重要】テクスチャ（VRAM）から画像（RAM/IImage）へピクセルを引き抜く
-    video::IImage* glyph_img = driver->createImage(render_tex, core::position2d<s32>(0,0), dim);
+	// 5. 【重要】テクスチャ（VRAM）から画像（RAM/IImage）へピクセルを引き抜く
+	video::IImage* glyph_img = driver->createImage(render_tex, core::position2d<s32>(0,0), dim);
 
-    if (glyph_img) {
-        // --- ここでアルファ補正（2値化）を注入！ ---
-        core::dimension2du size = glyph_img->getDimension();
-        for (u32 y = 0; y < size.Height; y++) {
-            for (u32 x = 0; x < size.Width; x++) {
-                video::SColor pixel = glyph_img->getPixel(x, y);
-                
-                // しきい値（例えば30）以上なら、完全不透明(255)にブースト
-                // これで「消えかかっていた横棒」がクッキリ浮かび上がります
-                if (pixel.getAlpha() > 79) {
-                    pixel.setAlpha(255);
-                    // 看板側で色が反転したり黒くなったりするのを防ぐため、
-                    // RGBも最大値（白）にしておくのが安全です
-                    pixel.setRed(255);
-                    pixel.setGreen(255);
-                    pixel.setBlue(255);
-                } else {
-                    pixel.setAlpha(0);
-                }
-                glyph_img->setPixel(x, y, pixel);
-            }
-        }
-    }
+	if (glyph_img) {
+		// --- ここでアルファ補正（2値化）を注入！ ---
+		core::dimension2du size = glyph_img->getDimension();
+		for (u32 y = 0; y < size.Height; y++) {
+			for (u32 x = 0; x < size.Width; x++) {
+				video::SColor pixel = glyph_img->getPixel(x, y);
+				
+				// しきい値（例えば30）以上なら、完全不透明(255)にブースト
+				// これで「消えかかっていた横棒」がクッキリ浮かび上がります
+				if (pixel.getAlpha() > 79) {
+					pixel.setAlpha(255);
+					// 看板側で色が反転したり黒くなったりするのを防ぐため、
+					// RGBも最大値（白）にしておくのが安全です
+					pixel.setRed(255);
+					pixel.setGreen(255);
+					pixel.setBlue(255);
+				} else {
+					pixel.setAlpha(0);
+				}
+				glyph_img->setPixel(x, y, pixel);
+			}
+		}
+	}
 
-    // 6. 使い終わったテクスチャを消去
-    driver->removeTexture(render_tex);
+	// 6. 使い終わったテクスチャを消去
+	driver->removeTexture(render_tex);
 
-    return (void*)glyph_img;
+	return (void*)glyph_img;
 }
 // 関数 UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
@@ -193,15 +194,15 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 	if (!dest_img_ptr) return;
 	video::IImage *dest_img = reinterpret_cast<video::IImage*>(dest_img_ptr);
 
+	// --- 0. 共通の物差し（Manager）から最新設定を取得 ---
+	UTF8SignConfig &cfg = UTF8SignManager::getInstance()->config;
+
 	// --- 1. 終端チェックと外枠剥離 ---
-	// 最後に ']' があることを前提に、その手前までを解析対象とする
 	if (command.empty() || command.front() != '[' || command.back() != ']') {
-		// 構文エラーをチャット/ログに通知
 		actionstream << "UTF8FontEngine: Syntax Error (Missing []): " << command << std::endl;
 		return;
 	}
 
-	// [ ] を取り除いた中身: "utf8combine:115x115:15,2@RRGGBB=Text"
 	std::string inner = command.substr(1, command.length() - 2);
 
 	// --- 2. 大ブロックの分離 (コロンによる分割) ---
@@ -213,19 +214,18 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 		return;
 	}
 
-	// 各ブロックの抽出
-	std::string size_part = inner.substr(first_colon + 1, second_colon - first_colon - 1); // "115x115"
-	std::string content_part = inner.substr(second_colon + 1); // "15,2@RRGGBB=Text"
+	std::string size_part = inner.substr(first_colon + 1, second_colon - first_colon - 1);
+	std::string content_part = inner.substr(second_colon + 1);
 
 	// --- 3. 詳細パース：キャンバスサイズ ---
-	u32 canvas_w = 115, canvas_h = 115;
+	// デフォルト値を cfg.width に変更
+	u32 canvas_w = cfg.width, canvas_h = 115; 
 	size_t x_pos = size_part.find('x');
 	if (x_pos != std::string::npos) {
 		canvas_w = mystoi(size_part.substr(0, x_pos));
 		canvas_h = mystoi(size_part.substr(x_pos + 1));
 	}
 
-	// キャンバスの初期化
 	dest_img->fill(video::SColor(0, 0, 0, 0));
 
 	// --- 4. 詳細パース：座標・色・テキスト ---
@@ -236,48 +236,42 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 	}
 
 	std::string settings = content_part.substr(0, equal);
-	std::string raw_text = content_part.substr(equal + 1); // ここで純粋な「中身」が確定
+	std::string raw_text = content_part.substr(equal + 1);
 
-	u32 start_x = 15, start_y = 2;
-	video::SColor target_color(255, 255, 255, 255); // デフォルト白
+	// ★ 座標の初期値を設定値 (padding_x) に同期
+	u32 start_x = cfg.padding_x; 
+	u32 start_y = 2; // ここも将来的に cfg.padding_y を追加可能
+	video::SColor target_color(255, 255, 255, 255);
+
+	// カラーコード解析
 	size_t at_sign = settings.find('@');
-	size_t comma = settings.find(',');
-
-	// カラーコード (@RRGGBB) の解析
 	if (at_sign != std::string::npos) {
 		std::string hex_str = settings.substr(at_sign + 1);
 		try {
 			unsigned long color_val = std::stoul(hex_str, nullptr, 16);
-			target_color = video::SColor(255, 
-				(color_val >> 16) & 0xFF, 
-				(color_val >> 8) & 0xFF, 
-				color_val & 0xFF);
-		} catch (...) {
-			target_color = video::SColor(255, 255, 255, 255);
-		}
+			target_color = video::SColor(255, (color_val >> 16) & 0xFF, (color_val >> 8) & 0xFF, color_val & 0xFF);
+		} catch (...) {}
 	}
 
-	// 座標の解析
+	// 座標解析（コマンド指定があれば上書き）
+	size_t comma = settings.find(',');
 	if (comma != std::string::npos) {
 		start_x = mystoi(settings.substr(0, comma));
-		// Y座標はカンマから「@」の手前まで、または末尾まで
 		size_t y_end = (at_sign != std::string::npos) ? at_sign : settings.length();
 		start_y = mystoi(settings.substr(comma + 1, y_end - (comma + 1)));
 	}
 
 	if (raw_text.empty()) return;
-	// renderUtf8Combine 内、raw_text 確定直後
-	warningstream << "[utf8_debug] text_size: " << raw_text.length() << " first_char: " << (int)raw_text[0] << std::endl;
 
-	// 2. 動的な改行幅の計算
+	// 改行幅の計算（余白を考慮）
 	int wrap_width = canvas_w - (start_x * 2); 
 	if (wrap_width <= 0) wrap_width = canvas_w;
 	std::vector<std::string> lines = utf8_53::get_lines(raw_text, wrap_width);
 
 	u32 y_cursor = start_y;
 	for (const std::string &line_str : lines) {
-		// ★ 行の処理に入る「直前」で、今から書く行がハミ出さないか厳格にチェック
-		if (y_cursor + 12 > canvas_h) break; 
+		// 描画の高さ安全チェックも、リクエストサイズ(14)ではなく設定値に準拠
+		if (y_cursor + cfg.line_height > canvas_h) break; 
 
 		u32 x_cursor = start_x;
 		std::vector<int> cps = utf8_53::to_codepoints(line_str);
@@ -286,36 +280,31 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 			u32 current_w = 12; 
 			try {
 				ImageRGBA glyph = m_atlas->getGlyphImage(cp);
-				// 右端ブレーキ：次の文字がキャンバスからはみ出すならその行は終了
 				if (x_cursor + glyph.width > canvas_w) break;
 				
 				current_w = glyph.width;
 
-				for (int gy = 0; gy < 12; gy++) {
+				for (int gy = 0; gy < (int)glyph.height; gy++) {
 					for (int gx = 0; gx < (int)glyph.width; gx++) {
 						int i = (gy * glyph.width + gx) * 4;
-						
-						// ★ ここで色を適用！
-						// アトラスから Alpha だけ抜き出し、色は target_color を使う
+
 						video::SColor pixel_color = target_color;
 						pixel_color.setAlpha(glyph.data[i + 3]); 
 
 						if (pixel_color.getAlpha() > 0) {
+							// 14px高アトラスなら gy=13 (14px目) まで描画される
 							dest_img->setPixel(x_cursor + gx, y_cursor + gy, pixel_color);
 						}
 					}
 				}
 			} catch (...) {}
 			
-			// 文字を一つ書き終えたら、その幅分だけ右へ進める
 			x_cursor += current_w; 
-			// ★ 130 固定を canvas_w に変更！
 			if (x_cursor >= canvas_w) break; 
 		}
 		
-		// 次の行へ（12px+1pxの余白 = 13px）
-		y_cursor += 13; 
-//		if (y_cursor + 12 > canvas_h) break; 
+		// ★ ここが近代化の核心：行送りを cfg.line_height (14px) に変更
+		y_cursor += cfg.line_height; 
 	}
 }
  

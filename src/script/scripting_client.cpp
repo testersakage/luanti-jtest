@@ -23,71 +23,73 @@
 #include "lua_api/l_settings.h"
 #include "lua_api/l_client_sound.h"
 #include "lua_api/l_utf8_font.h"  // ★追加 API のヘッダ
+#include "lua_api/l_utf8_sign_client.h"  // ★追加 API のヘッダ
 
 ClientScripting::ClientScripting(Client *client):
-    ScriptApiBase(ScriptingType::Client)
+	ScriptApiBase(ScriptingType::Client)
 {
-    setGameDef(client);
+	setGameDef(client);
 
-    SCRIPTAPI_PRECHECKHEADER
+	SCRIPTAPI_PRECHECKHEADER
 
-    // Security is mandatory client side
-    initializeSecurityClient();
+	// Security is mandatory client side
+	initializeSecurityClient();
 
-    lua_getglobal(L, "core");
-    int top = lua_gettop(L);
+	lua_getglobal(L, "core");
+	int top = lua_gettop(L);
 
-    lua_newtable(L);
-    lua_setfield(L, -2, "ui");
+	lua_newtable(L);
+	lua_setfield(L, -2, "ui");
 
-    InitializeModApi(L, top);
-    lua_pop(L, 1);
+	InitializeModApi(L, top);
+	lua_pop(L, 1);
 
-    // Push builtin initialization type
-    lua_pushstring(L, "client");
-    lua_setglobal(L, "INIT");
+	// Push builtin initialization type
+	lua_pushstring(L, "client");
+	lua_setglobal(L, "INIT");
 
-    infostream << "SCRIPTAPI: Initialized client game modules" << std::endl;
+	infostream << "SCRIPTAPI: Initialized client game modules" << std::endl;
 }
 
 void ClientScripting::InitializeModApi(lua_State *L, int top)
 {
-    LuaItemStack::Register(L);
-    ItemStackMetaRef::Register(L);
-    LuaRaycast::Register(L);
-    StorageRef::Register(L);
-    LuaMinimap::Register(L);
-    NodeMetaRef::RegisterClient(L);
-    LuaLocalPlayer::Register(L);
-    LuaCamera::Register(L);
-    ModChannelRef::Register(L);
-    LuaSettings::Register(L);
-    ClientSoundHandle::Register(L);
+	LuaItemStack::Register(L);
+	ItemStackMetaRef::Register(L);
+	LuaRaycast::Register(L);
+	StorageRef::Register(L);
+	LuaMinimap::Register(L);
+	NodeMetaRef::RegisterClient(L);
+	LuaLocalPlayer::Register(L);
+	LuaCamera::Register(L);
+	ModChannelRef::Register(L);
+	LuaSettings::Register(L);
+	ClientSoundHandle::Register(L);
 
-    ModApiUtil::InitializeClient(L, top);
-    ModApiClientCommon::Initialize(L, top);
-    ModApiClient::Initialize(L, top);
-    ModApiItem::InitializeClient(L, top);
-    ModApiStorage::Initialize(L, top);
-    ModApiEnv::InitializeClient(L, top);
-    ModApiChannels::Initialize(L, top);
-    ModApiParticlesLocal::Initialize(L, top);
-    ModApiClientSound::Initialize(L, top);
+	ModApiUtil::InitializeClient(L, top);
+	ModApiClientCommon::Initialize(L, top);
+	ModApiClient::Initialize(L, top);
+	ModApiItem::InitializeClient(L, top);
+	ModApiStorage::Initialize(L, top);
+	ModApiEnv::InitializeClient(L, top);
+	ModApiChannels::Initialize(L, top);
+	ModApiParticlesLocal::Initialize(L, top);
+	ModApiClientSound::Initialize(L, top);
 
-    LuaUTF8Font::Initialize(L, top);  // ★ここに追加
+	LuaUTF8Font::Initialize(L, top);  // ★ここに追加
+	l_utf8_sign_client::Initialize(L, top);  // ★ここに追加
 }
 
 void ClientScripting::on_client_ready(LocalPlayer *localplayer)
 {
-    LuaLocalPlayer::create(getStack(), localplayer);
+	LuaLocalPlayer::create(getStack(), localplayer);
 }
 
 void ClientScripting::on_camera_ready(Camera *camera)
 {
-    LuaCamera::create(getStack(), camera);
+	LuaCamera::create(getStack(), camera);
 }
 
 void ClientScripting::on_minimap_ready(Minimap *minimap)
 {
-    LuaMinimap::create(getStack(), minimap);
+	LuaMinimap::create(getStack(), minimap);
 }

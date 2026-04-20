@@ -11,22 +11,28 @@
 std::map<int, ImageRGBA> UTF8FontAtlas::m_atlas_pages;
 
 // 1. 切り出し関数を可変幅(target_w)対応に
-static ImageRGBA crop_glyph_custom(const ImageRGBA &src, int gx, int gy, int target_w)
+static ImageRGBA crop_glyph_custom(const ImageRGBA &src, int gx, int gy, int target_w, int target_h)
 {
 	ImageRGBA out;
 	out.width = target_w;
-	out.height = 12;
-	out.data.resize(target_w * 12 * 4);
+	out.height = target_h; // ★ 12 固定から引数へ
+	out.data.resize(target_w * target_h * 4);
 
-	for (int yy = 0; yy < 12; yy++) {
+	for (int yy = 0; yy < target_h; yy++) { // ★ ループも target_h 回に
 		for (int xx = 0; xx < target_w; xx++) {
 			int sx = gx + xx;
 			int sy = gy + yy;
-			if (sx >= src.width || sy >= src.height) continue;
+			
+			// 念のための境界チェック
+			if (sx < 0 || sx >= (int)src.width || sy < 0 || sy >= (int)src.height)
+				continue;
 
 			int src_i = (sy * src.width + sx) * 4;
 			int dst_i = (yy * target_w + xx) * 4;
-			for (int k = 0; k < 4; k++) out.data[dst_i + k] = src.data[src_i + k];
+			
+			for (int k = 0; k < 4; k++) {
+				out.data[dst_i + k] = src.data[src_i + k];
+			}
 		}
 	}
 	return out;
@@ -107,27 +113,40 @@ const ImageRGBA &UTF8FontAtlas::loadPage(int page)
 /* --- 4. メインの切り出し関数 --- */
 ImageRGBA UTF8FontAtlas::getGlyphImage(int codepoint)
 {
-	// 【ログ】0などの低位コードポイントが来たら報告
-	if (codepoint < 32) {
-		infostream << "UTF8FontAtlas: Low codepoint (possible ghost): 0x" 
-				   << std::hex << codepoint << std::dec << std::endl;
-	}
+    if (codepoint < 0) throw std::runtime_error("Invalid CP");
 
-	if (codepoint < 0) throw std::runtime_error("Invalid CP");
+    // 【ログ】制御文字などの低位コードポイント報告
+    if (codepoint < 32) {
+        infostream << "UTF8FontAtlas: Low codepoint (possible ghost): 0x" 
+                   << std::hex << codepoint << std::dec << std::endl;
+    }
 
-	int page = codepoint / 256;
-	int index = codepoint % 256;
+    int page = codepoint / 256;
+    int index = codepoint % 256;
 
-	// ASCIIページ(00)なら幅6px、それ以外は12pxとして出荷
-	int current_w = (page == 0) ? 6 : 12;
+    // 1. ページのロード
+    const ImageRGBA &atlas = loadPage(page);
 
-	// 座標計算
-	int gx = (index % 32) * 12; // 読み取り開始位置は常に12px刻み
-	int gy = (index / 32) * 12;
+    // 2. ★ アトラスの実サイズから「1行の高さ」を動的に算出
+    // アトラスは 256文字(32x8グリッド)なので、高さ / 8行 でステップを出す
+    // 96pxなら 12、112pxなら 14 と自動判定される
+    u32 actual_line_h = atlas.height / 8;
 
-	const ImageRGBA &atlas = loadPage(page);
+    // 3. ★ 職人の黄金律を適用 (幅の判定)
+    // ASCII(00) および 半角カナ(FF) の範囲を 6px、それ以外を 12px とする
+    int current_w = 12;
+    if (page == 0x00 && index <= 0x7F) {
+        current_w = 6;
+    } else if (page == 0xFF && (index >= 0x61 && index <= 0x9F)) {
+        current_w = 6;
+    }
 
-	// 自作の可変幅切り出し関数を呼ぶ
-	return crop_glyph_custom(atlas, gx, gy, current_w);	
-//	return crop_glyph_12x12(atlas, gx, gy);
+    // 4. 座標計算
+    // 横(gx)は常に 12px 刻みのグリッド
+    // 縦(gy)はステップ高(12 or 14)に応じた位置を計算
+    int gx = (index % 32) * 12;
+    int gy = (index / 32) * actual_line_h;
+
+    // 5. 切り出し実行 (高さは画像の実態に合わせる)
+    return crop_glyph_custom(atlas, gx, gy, current_w, actual_line_h);
 }

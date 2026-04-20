@@ -108,8 +108,8 @@ int get_char_width(int cp) {
 	return 2;
 }
 
-    // デフォルトは 1列
-    return 1;
+	// デフォルトは 1列
+	return 1;
 }
 
 int get_string_width(const std::string &s) {
@@ -153,80 +153,90 @@ int get_total_pixel_width(const std::string &s) {
 
 //  指定したピクセル幅に収まるように安全にカットする
 std::string truncate_to_pixel_width(const std::string &s, int max_px) {
-	std::string res = "";
-	int current_px = 0;
-	size_t pos = 0;
-	int cp;
+    std::string res = "";
+    int current_px = 0;
+    size_t pos = 0;
+    int cp;
 
-	while (pos < s.length()) {
-		size_t last_pos = pos;
-		if (!get_next_char(s, pos, cp)) break;
+    while (pos < s.length()) {
+        size_t last_pos = pos;
+        if (!get_next_char(s, pos, cp)) break;
 
-		// ★【重要】改行コード (LF=10, CR=13) が来たら、この行の切り出しを終了する
-		if (cp == '\n' || cp == '\r') {
-			break; 
-		}
+        // 改行コードで停止
+        if (cp == '\n' || cp == '\r') {
+            break; 
+        }
 
-		int w = (get_char_width(cp) == 2 ? 12 : 6);
-		if (current_px + w > max_px) break;
+        // ★【修正ポイント】物差しを getTextWidth と完全に同期させる
+        // ASCII(0x7F以下) と 半角カナ(FF61-FF9F) 以外はすべて 12px (全角)
+        int w = 12;
+        if (cp <= 0x7F || (cp >= 0xFF61 && cp <= 0xFF9F)) {
+            w = 6;
+        }
 
-		res.append(s.substr(last_pos, pos - last_pos));
-		current_px += w;
-	}
-	return res;
+        if (current_px + w > max_px) break;
+
+        res.append(s.substr(last_pos, pos - last_pos));
+        current_px += w;
+    }
+    return res;
 }
 	
 //  文字列を指定範囲で切り出す＋自動改行
 std::vector<std::string> get_lines(const std::string &s, int max_px) {
-	std::vector<std::string> lines;
-	std::string remaining = s;
-	int line_count = 0; // Debug用
+    std::vector<std::string> lines;
+    std::string remaining = s;
 
-	// 呼び出し時の生文字列と設定幅を確認
-	// infostream << "[get_lines_debug] START: max_px=" << max_px << " text=[" << s << "]" << std::endl;
+    while (!remaining.empty()) {
+        // 1. まず現在の幅(max_px)に収まる「物理的な限界」を測る
+        std::string line = truncate_to_pixel_width(remaining, max_px);
+        size_t consume_len = line.length();
 
-	while (!remaining.empty()) {
-		// 現在の行に収まる分を切り出す
-		std::string line = truncate_to_pixel_width(remaining, max_px);
+        // --- ハイブリッド・ラップ処理 ---
+        // もし物理限界が文字列の途中であり、かつその直後にスペースや改行がない場合
+        if (consume_len < remaining.length()) {
+            char next_char = remaining[consume_len];
+            if (next_char != ' ' && next_char != '\n' && next_char != '\r') {
+                // 単語の途中かもしれないので、直前のスペースを探す
+                size_t last_space = line.find_last_of(" ");
+                
+                // スペースが見つかり、かつそれが極端に手前でない場合のみ、そこで改行する
+                // (あまりに手前すぎると空白が目立つので、その場合は文字単位で切る「ハイブリッド」判断)
+                if (last_space != std::string::npos && last_space > (line.length() * 0.6)) {
+                    line = line.substr(0, last_space);
+                    consume_len = last_space + 1; // スペースそのものは消費して消す
+                }
+            }
+        }
 
-		// --- ここから修正 ---
-		size_t consume_len = line.length();
+        // --- 改行コードの処理 (既存ロジック) ---
+        if (consume_len < remaining.length()) {
+            if (remaining[consume_len] == '\n') {
+                consume_len += 1;
+            } else if (remaining[consume_len] == '\r') {
+                consume_len += 1;
+                if (consume_len < remaining.length() && remaining[consume_len] == '\n') {
+                    consume_len += 1;
+                }
+            }
+        }
 
-		// truncateが止まった位置の「次」が改行コードかどうかを確認
-		if (consume_len < remaining.length()) {
-			if (remaining[consume_len] == '\n') {
-				consume_len += 1; // 改行コードを「消費」するが、lineには含めない
-			} else if (remaining[consume_len] == '\r') {
-				consume_len += 1;
-				// Windowsの \r\n 対策
-				if (consume_len < remaining.length() && remaining[consume_len] == '\n') {
-					consume_len += 1;
-				}
-			}
-		}
+        // 1文字も入らない場合の救済（巨大な全角文字など）
+        if (line.empty() && !remaining.empty()) {
+            size_t pos = 0;
+            int cp;
+            if (get_next_char(remaining, pos, cp)) {
+                line = remaining.substr(0, pos);
+                consume_len = pos;
+            } else {
+                break;
+            }
+        }
 
-		if (line.empty()) {
-			// 1文字も入らない（1文字がmax_pxより大きい）場合は、強制的に1文字出す
-			size_t pos = 0;
-			int cp;
-			if (get_next_char(remaining, pos, cp)) {
-				line = remaining.substr(0, pos);
-			} else {
-				break; // 異常系
-			}
-		}
-
-		// --- デバッグログ ---
-		line_count++;
-		// infostream << "[get_lines_debug] L" << line_count 
-		//            << ": text=[" << line << "] len=" << line.length() 
-		//            << " consumed=" << consume_len 
-		//            << (found_newline ? " (NEWLINE_SKIP)" : "") << std::endl;
-
-		lines.push_back(line);
-		remaining = remaining.substr(consume_len);
-	}
-	return lines;
+        lines.push_back(line);
+        remaining = (consume_len < remaining.length()) ? remaining.substr(consume_len) : "";
+    }
+    return lines;
 }
 
 } // namespace utf8_53
