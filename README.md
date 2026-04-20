@@ -25,17 +25,31 @@
 
 ------------------------------
 ## 🚀 導入と利用例  
-## mod_utf8sign_sample (同梱サンプル)  
+
+このエンジンを利用するには、**フォントアトラス（PNG画像）** の準備が必要です。
+
+### 1. フォントアトラスの生成  
+本エンジン専用のアトラス生成ツール [**font2unimg**](https://github.com/testersakage/font2unimg) を使用して、お好みの TrueType フォントから PNG 画像を生成してください。
+*   **推奨設定**: `line_height: 14` (14px高) で生成することで、本エンジンの真価を発揮します。
+*   生成した画像は、各 Mod の指定フォルダ（例: `textures/`）に配置してください。
+
+### 2. mod_utf8sign_sample (同梱サンプル)
 Minetest Game の標準看板を近代化するサンプル Mod を提供しています。
 
--- たったこれだけで、4行の高密度日本語看板が実現します  
+-- 1. まず C++ 側に看板の規格を教える  
+```lua
 minetest.utf8sign.set_config({  
     width = 115,  
     line_height = 14,  
     max_lines = 4,  
     char_w = 5  
-})
-local texture = "[utf8combine:115x82:15,14@000000=こんにちは、世界！]"  
+})  
+```
+
+-- 2. utf8combine 命令で描画（自動的に生成したアトラスが参照されます）  
+```lua
+local texture = "[utf8combine:115x82:15,14@000000=こんにちは、世界！]"
+```
 
 ------------------------------
 ## 📘 English Overview
