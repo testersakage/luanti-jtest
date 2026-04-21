@@ -24,6 +24,8 @@ set(common_SCRIPT_LUA_API_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/l_playermeta.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_rollback.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_server.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_utf8_53_server.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_utf8_sign_server.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_settings.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_storage.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_util.cpp
@@ -44,4 +46,6 @@ set(client_SCRIPT_LUA_API_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/l_pause_menu.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_storage.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_sscsm.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_utf8_font.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_utf8_sign_client.cpp
 	PARENT_SCOPE)

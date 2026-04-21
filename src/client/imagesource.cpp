@@ -4,6 +4,7 @@
 
 #include "imagesource.h"
 
+#include "utf8_fontengine.h" // utf8追加
 #include "exceptions.h"
 #include <IFileSystem.h>
 #include <IReadFile.h>
@@ -1082,6 +1083,35 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 				}
 			}
 		}
+
+		/*
+			[utf8combine:WxH:テキスト (あなたの新設命令)
+		*/
+		else if (str_starts_with(part_of_name, "[utf8combine"))
+		{
+			Strfnd sf(part_of_name);
+			sf.next(":");
+			u32 w0 = stoi(sf.next("x"));
+			u32 h0 = stoi(sf.next(":"));
+			// ... (w0, h0取得後) ...
+//			if (w0 == 115 && h0 == 115) {
+//				w0 = 192; // 16pxフォントのための黄金サイズ
+//				h0 = 192;
+//			}
+
+			if (!baseimg) {
+				baseimg = driver->createImage(video::ECF_A8R8G8B8, {w0, h0});
+				baseimg->fill(video::SColor(0,0,0,0));
+			}
+
+			// ロジックの本体は別ファイル (utf8_fontengine.cpp) に丸投げ
+			// part_of_name には "[utf8combine:100x50:..." が丸ごと入っています
+			// part_of_name の後ろに .data() を付けるか、std::string() で囲む
+			UTF8FontEngine::renderUtf8Combine(baseimg, std::string(part_of_name));
+
+			return true; // 1000行の魔境をスルーして即座に脱出！
+		}
+
 		/*
 			[combine:WxH:X,Y=filename:X,Y=filename2
 			Creates a bigger texture from any amount of smaller ones

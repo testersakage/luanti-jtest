@@ -358,6 +358,7 @@ const std::string &Client::getClientModsLuaPath()
 	return clientmods_dir;
 }
 
+
 const std::vector<ModSpec>& Client::getMods() const
 {
 	static std::vector<ModSpec> client_modspec_temp;

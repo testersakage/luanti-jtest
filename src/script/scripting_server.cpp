@@ -33,6 +33,9 @@
 #include "lua_api/l_http.h"
 #include "lua_api/l_storage.h"
 #include "lua_api/l_ipc.h"
+#include "lua_api/l_utf8_font.h"
+#include "lua_api/l_utf8_53_server.h" // 追加
+#include "lua_api/l_utf8_sign_server.h" // 追加
 
 extern "C" {
 #include <lualib.h>
@@ -157,6 +160,10 @@ void ServerScripting::InitializeModApi(lua_State *L, int top)
 	ModApiStorage::Initialize(L, top);
 	ModApiChannels::Initialize(L, top);
 	ModApiIPC::Initialize(L, top);
+	LuaUTF8::Initialize(L, top); // 追加
+	LuaUTF8Font::Initialize(L, top); // 追加
+	l_utf8_sign_server::Initialize(L, top); // 追加
+
 }
 
 void ServerScripting::InitializeAsync(lua_State *L, int top)

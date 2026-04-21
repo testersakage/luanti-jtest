@@ -7,6 +7,7 @@ set(common_SCRIPT_COMMON_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/c_internal.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/c_packer.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/helper.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_utf8sign.cpp  # ★ここに追加
 	PARENT_SCOPE)
 
 set(client_SCRIPT_COMMON_SRCS

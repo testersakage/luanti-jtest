@@ -22,6 +22,8 @@
 #include "lua_api/l_camera.h"
 #include "lua_api/l_settings.h"
 #include "lua_api/l_client_sound.h"
+#include "lua_api/l_utf8_font.h"  // ★追加 API のヘッダ
+#include "lua_api/l_utf8_sign_client.h"  // ★追加 API のヘッダ
 
 ClientScripting::ClientScripting(Client *client):
 	ScriptApiBase(ScriptingType::Client)
@@ -72,6 +74,9 @@ void ClientScripting::InitializeModApi(lua_State *L, int top)
 	ModApiChannels::Initialize(L, top);
 	ModApiParticlesLocal::Initialize(L, top);
 	ModApiClientSound::Initialize(L, top);
+
+	LuaUTF8Font::Initialize(L, top);  // ★ここに追加
+	l_utf8_sign_client::Initialize(L, top);  // ★ここに追加
 }
 
 void ClientScripting::on_client_ready(LocalPlayer *localplayer)
