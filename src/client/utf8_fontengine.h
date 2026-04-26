@@ -1,16 +1,20 @@
 // src/client/utf8_fontengine.h
 #pragma once
 
-//#include "../irrlichttypes.h"
-//#include "../irrlichttypes_video.h" // これが必要
+#include "irrlichttypes.h"
+#include <IImage.h>
 #include <string>
 #include <vector>
 
+struct RenderTask; 
 // ★ ここに「前方宣言」を追加
 class UTF8FontAtlas; 
 
 class UTF8FontEngine {
 public:
+	UTF8FontEngine();  // ★追加：コンストラクタの宣言
+	~UTF8FontEngine(); // ★追加：デストラクタの宣言
+
 	/**
 	 * 指定したUTF-8文字列が、現在のフォント設定で
 	 * 何ピクセルの幅になるかを返します。
@@ -41,6 +45,11 @@ public:
 	static void renderUtf8Combine(void *dest_img_ptr, const std::string &command);
 
 	/**
+	 * imagesource.cpp からの [utf8combineft 命令を受け取り、看板をレンダリングします。
+	*/
+	static void renderutf8combineft(video::IImage *baseimg, const std::string &spec);
+
+	/**
 	 * フォントエンジンから指定した文字のグリフ（画像）を取得します。
 	 * 仮想スクリーンバッファ方式により、フォントの種類を問わずキャプチャ可能です。
 	 */
@@ -49,4 +58,8 @@ public:
 private:
 	// ★ ここに「倉庫番」を配属します
 	static UTF8FontAtlas *m_atlas; 
+
+	// render関数のパース処理担当
+	static RenderTask parseUtf8Spec(const std::string &spec);
+
 };

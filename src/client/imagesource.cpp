@@ -1084,6 +1084,31 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 			}
 		}
 
+		else if (str_starts_with(part_of_name, "[utf8combineft")) // ★第二章：純粋TTF版の窓口
+		{
+			Strfnd sf(part_of_name);
+			sf.next(":");
+			u32 w0 = stoi(sf.next("x"));
+			u32 h0 = stoi(sf.next(":"));
+
+			// 安全装置：2048pxを上限として、巨大すぎるリクエストからシステムを守る
+			if (w0 > 2048 || h0 > 2048) {
+				errorstream << "utf8combineft: Image size (" << w0 << "x" << h0 << ") exceeds limit (2048)!" << std::endl;
+				return false;
+			}
+
+			// サイズ解析
+			if (!baseimg) {
+				baseimg = driver->createImage(video::ECF_A8R8G8B8, {w0, h0});
+				baseimg->fill(video::SColor(0,0,0,0));
+			}
+
+			// 新設する FT 専用の丸投げ先
+			UTF8FontEngine::renderutf8combineft(baseimg, std::string(part_of_name));
+
+			return true; // 魔境を回避して脱出！
+		}
+
 		/*
 			[utf8combine:WxH:テキスト (あなたの新設命令)
 		*/
@@ -1093,11 +1118,12 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 			sf.next(":");
 			u32 w0 = stoi(sf.next("x"));
 			u32 h0 = stoi(sf.next(":"));
-			// ... (w0, h0取得後) ...
-//			if (w0 == 115 && h0 == 115) {
-//				w0 = 192; // 16pxフォントのための黄金サイズ
-//				h0 = 192;
-//			}
+
+			// 安全装置：2048pxを上限として、巨大すぎるリクエストからシステムを守る
+			if (w0 > 2048 || h0 > 2048) {
+				errorstream << "utf8combineft: Image size (" << w0 << "x" << h0 << ") exceeds limit (2048)!" << std::endl;
+				return false;
+			}
 
 			if (!baseimg) {
 				baseimg = driver->createImage(video::ECF_A8R8G8B8, {w0, h0});

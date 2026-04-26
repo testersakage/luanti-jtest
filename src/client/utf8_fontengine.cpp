@@ -2,11 +2,14 @@
 // Luanti
 // SPDX-License-Identifier: LGPL-2.1-or-later
 // Copyright (C) 2010-2014 sapier <sapier at gmx dot net>
+#define FT_DEBUG_VIEW 0 // 1 にすると診断モード起動！
 
 // 1. Irrlichtの型を使うための「親玉」を一番上に持ってくる
 #include "irrlichttypes.h" 
 #include "utf8_fontatlas.h"
 #include "utf8_fontengine.h"
+#include "porting.h" // これが必要
+#include "filesys.h" // これで DIR_DELIM が使えるようになる
 
 #include "fontengine.h"	   // g_fontengine にアクセスするため
 #include "util/string.h"	   // utf8_to_wide 用
@@ -27,6 +30,29 @@
 #include <sstream> // これを忘れずに！
 #include <vector>
 #include <string>
+
+#include "sdl2_font.h" // これを忘れずに
+
+struct RenderTask { // TTF用の構造体
+    std::vector<u32> codes;
+    u32 start_x = 0;
+    u32 start_y = 0;
+};
+
+UTF8FontEngine::UTF8FontEngine()
+{
+	// コンストラクタでは「初期化（init）」をあえてしない！
+	// すべては renderutf8combineft の「遅延初期化」に任せる。
+	// これが、今のあなたの環境で「16px」を確実に通すための最善策です。
+	
+	infostream << "UTF8FontEngine: Created. Initialization deferred until first render." << std::endl;
+}
+
+UTF8FontEngine::~UTF8FontEngine()
+{
+	// クリーンアップも忘れずに
+	sdl2_font::cleanup();
+}
 
 // ★ staticメンバの実体を定義
 UTF8FontAtlas* UTF8FontEngine::m_atlas = nullptr;
@@ -187,6 +213,59 @@ void* UTF8FontEngine::getGlyphImage(wchar_t c)
 
 	return (void*)glyph_img;
 }
+
+
+
+
+// UTF8FontEngine.cpp 内の parseUtf8Spec
+RenderTask UTF8FontEngine::parseUtf8Spec(const std::string &spec)
+{
+	RenderTask task; // メモ用紙を実体化
+
+	size_t size_pos = spec.find(":");
+	size_t coord_pos = spec.find(":", size_pos + 1);
+	size_t color_pos = spec.find("@", coord_pos + 1);
+
+	if (coord_pos != std::string::npos && color_pos != std::string::npos) {
+		std::string coords = spec.substr(coord_pos + 1, color_pos - (coord_pos + 1));
+		size_t comma = coords.find(",");
+		if (comma != std::string::npos) {
+			// ここで開始座標(例: 15, 14)を取得！
+			u32 start_x = std::stoul(coords.substr(0, comma));
+			u32 start_y = std::stoul(coords.substr(comma + 1));
+
+			// これを cursor_x, cursor_y の初期値にセットする
+			task.start_x = start_x;
+			task.start_y = start_y;
+		}
+	}
+
+	std::vector<u32> codes;
+	size_t start_pos = spec.find("UTF8:");
+	if (start_pos == std::string::npos) return task;
+
+	// "UTF8:" の後から最後までを一旦取り出す
+	std::string list = spec.substr(start_pos + 5);
+	
+	// もし末尾に "]" が付いていたら除去する（職人の皿洗い）
+	if (!list.empty() && list.back() == ']') {
+		list.pop_back();
+	}
+
+	std::stringstream ss(list);
+	std::string item;
+	while (std::getline(ss, item, ',')) {
+		if (item.empty()) continue;
+		try {
+			// ここで 10進数としてパース
+			task.codes.push_back(std::stoul(item));
+		} catch (...) { continue; }
+	}
+	return task;
+}
+
+
+
 // 関数 UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 {
@@ -195,7 +274,7 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 	video::IImage *dest_img = reinterpret_cast<video::IImage*>(dest_img_ptr);
 
 	// --- 0. 共通の物差し（Manager）から最新設定を取得 ---
-	UTF8SignConfig &cfg = UTF8SignManager::getInstance()->config;
+	UTF8AtlasConfig &cfg = UTF8SignManager::getInstance()->atlas;
 
 	// --- 1. 終端チェックと外枠剥離 ---
 	if (command.empty() || command.front() != '[' || command.back() != ']') {
@@ -218,8 +297,8 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 	std::string content_part = inner.substr(second_colon + 1);
 
 	// --- 3. 詳細パース：キャンバスサイズ ---
-	// デフォルト値を cfg.width に変更
-	u32 canvas_w = cfg.width, canvas_h = 115; 
+	// デフォルト値を cfg.sign_width に変更
+	u32 canvas_w = cfg.sign_width, canvas_h = 115; 
 	size_t x_pos = size_part.find('x');
 	if (x_pos != std::string::npos) {
 		canvas_w = mystoi(size_part.substr(0, x_pos));
@@ -306,5 +385,207 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 		// ★ ここが近代化の核心：行送りを cfg.line_height (14px) に変更
 		y_cursor += cfg.line_height; 
 	}
+}
+
+// Render UTF-8 Combine FreeType
+void UTF8FontEngine::renderutf8combineft(video::IImage *baseimg, const std::string &spec)
+{
+	if (!baseimg) return;
+
+	UTF8FTConfig &cfg = UTF8SignManager::getInstance()->ft;
+
+	// --- 職人の「心変わり」チェック ---
+	// 現在読み込み済みの情報と、最新の設定を突き合わせる
+	bool needs_init = false;
+	if (sdl2_font::get_library_ptr() == nullptr) {
+		needs_init = true;
+	} else if (sdl2_font::get_last_path() != cfg.ttf_name || 
+	           sdl2_font::get_last_index() != cfg.font_index ||
+	           sdl2_font::get_last_size() != cfg.font_size) {
+		// パス、インデックス、サイズのどれかが変わってたらリロード！
+		needs_init = true;
+	}
+
+	if (needs_init) {
+		actionstream << "SDL2Font: Reloading font due to config change." << std::endl;
+		sdl2_font::init(cfg.ttf_name, cfg.font_size, cfg.font_index);
+	}
+
+	u32 baseline = cfg.baseline_y;
+	bool aa      = cfg.antialias;
+	u32 f_size   = cfg.font_size;
+
+	if (sdl2_font::get_library_ptr() == nullptr) {
+		std::string font_path = g_settings->get("utf8_font_path");
+
+		// 第3引数に cfg.font_index を追加して、3つの引数で呼ぶ！
+		sdl2_font::init(font_path, cfg.font_size, cfg.font_index);
+	}
+
+
+/*
+	UTF8FTConfig &cfg = UTF8SignManager::getInstance()->ft;
+
+	// 全ての設定を Config から奪い取る
+	u32 baseline = cfg.baseline_y;
+	bool aa      = cfg.antialias;
+	u32 f_size   = cfg.font_size;
+
+	// --- フォント設定の遅延初期化（sdl2_fontdでは初期化できないから） ---
+	if (sdl2_font::get_library_ptr() == nullptr) {
+		// minetest.confからフォントパスを取得して初期化
+		std::string font_path = g_settings->get("utf8_font_path");
+//		if (font_path.empty()) font_path = "NotoSansMonoCJKjp-Regular.otf";
+//		u16 f_size = cfg.font_size;
+
+		sdl2_font::init(font_path, f_size);
+	}
+*/
+
+	// ---------------------------------------------------------
+
+#if FT_DEBUG_VIEW
+	u32 w = baseimg->getDimension().Width;
+	u32 h = baseimg->getDimension().Height;
+	u32 q = w / 4; // 1/4ずつの区切り
+
+	// --- [1/4] 窓口： imagesource からの到達確認 ---
+	// 濃いグレー（不透明）
+	for(u32 y=0; y<h; y++)
+		for(u32 x=0; x<q; x++)
+			baseimg->setPixel(x, y, video::SColor(255, 50, 50, 50));
+
+	// --- [2/4] 初期化： FT_Init_FreeType の成否 ---
+	int ft_err = sdl2_font::get_last_error();
+	video::SColor color2;
+
+	if (ft_err == 0 && sdl2_font::get_library_ptr() != nullptr) {
+		color2 = video::SColor(255, 0, 255, 0); // 成功なら「緑」
+	} else {
+		// 失敗なら「赤」の輝度でエラー番号を表現する
+		// errが0だと真っ黒になってしまうので、存在確認のために最低限の明るさ(50)を足すか、
+		// あるいは純粋に err そのものを叩き込む
+		u8 red_value = (u8)(ft_err & 0xFF);
+		// 青(100)の上に、赤(エラー番号)を乗せる
+		color2 = video::SColor(255, red_value, 0, 100);
+	}
+	for(u32 y=0; y<h; y++)
+		for(u32 x=q; x<q*2; x++)
+			baseimg->setPixel(x, y, color2);
+
+	// --- [3/4] 読込： FT_New_Face の成否 ---
+	bool ft_face_ok = (sdl2_font::get_face_ptr() != nullptr);
+	video::SColor color3 = ft_face_ok ? video::SColor(255, 0, 255, 0) : video::SColor(255, 255, 0, 0);
+	for(u32 y=0; y<h; y++)
+		for(u32 x=q*2; x<q*3; x++)
+			baseimg->setPixel(x, y, color3);
+
+	// --- [4/4] 予約： 現時点では黒 ---
+	for(u32 y=0; y<h; y++)
+		for(u32 x=q*3; x<w; x++)
+			baseimg->setPixel(x, y, video::SColor(255, 0, 0, 0));
+#endif
+
+//	std::vector<u32> codes = parseUtf8Spec(spec);
+//	if (codes.empty()) return;
+
+
+	// パース結果をローカルな変数「task」として受け取る
+	RenderTask task = parseUtf8Spec(spec);
+	if (task.codes.empty()) return;
+
+	// SignManager ではなく、この看板専用の task から座標を取る
+	u32 cursor_x = (task.start_x == 0) ? cfg.padding_x : task.start_x;
+	u32 cursor_y = (task.start_y == 0) ? cfg.padding_y : task.start_y;
+	u32 line_height = cfg.line_height; // ★1行の高さ（器の高さ）
+	u32 max_w = baseimg->getDimension().Width;
+	u32 max_h = baseimg->getDimension().Height;
+//	const bool use_aa = true; // まずは最高画質のアンチエイリアスONで！
+
+	for (u32 code : task.codes) {
+		// 1. 改行コード(10)が来たら、問答無用で次へ
+		if (code == 10) { 
+			cursor_x = (task.start_x == 0) ? cfg.padding_x : task.start_x;  // 改行時も base_x に戻る
+			cursor_y += line_height;
+			continue;
+		}
+
+		// 2. 自動折り返し：端まで来たら次の行へ（プロポーショナル対応）
+		// とりあえず全角幅(cfg.font_size)を基準に判定
+		if (cursor_x + cfg.font_size > max_w) {
+			cursor_x = task.start_x;
+			cursor_y += line_height;
+		}
+
+		// 3. 看板の底（下端）を突き抜けそうなら描画終了
+		if (cursor_y + line_height > max_h) break;
+
+		// --- (ここから描画処理) ---
+		u8 char_rgba[32 * 32 * 4] = {0}; // 高さは18px確保
+		if (sdl2_font::render_to_buffer(code, char_rgba, 32, 32, aa, f_size, baseline)) {
+			u32 advance = sdl2_font::get_last_char_advance();
+
+			// 転写時に cursor_y を加味する
+			for (u32 y = 0; y < cfg.line_height; y++) {
+				for (u32 x = 0; x < (cfg.font_size + 8); x++) {
+					int src_idx = (y * 32 + x) * 4;
+					u8 a = char_rgba[src_idx + 3];
+					if (a > 0) {
+						// ★ cursor_y を足して、正しい行に描く
+						baseimg->setPixel(cursor_x + x, cursor_y + y, video::SColor(a, 0, 0, 0));
+					}
+				}
+			}
+			cursor_x += advance;
+		}
+	}
+
+
+	/*
+	// 2. 看板の「物理規格」を定義 (SignManagerの黄金比を継承)
+	const u32 char_w = 12;
+	const u32 char_h = 14;
+	const bool use_aa = true; // まずは最高画質のアンチエイリアスONで！
+
+	u32 cursor_x = 0;
+	u32 max_w = baseimg->getDimension().Width;
+
+	u32 actual_advance = 0; // ここで宣言しておけば else でも見える
+	for (u32 code : codes) {
+		// 看板からはみ出すなら終了
+		if (cursor_x + char_w > max_w) break;
+
+		// 1文字分のRGBA作業バッファ
+		u8 char_rgba[char_w * char_h * 4] = {0};
+
+		// 3. FreeTypeで「12x14の器」に文字を焼く
+		// ここで 11pxベースライン合わせ が自動で行われる
+		if (sdl2_font::render_to_buffer(code, char_rgba, char_w, char_h, use_aa)) {
+			// フォントから歩幅を取得
+			actual_advance = sdl2_font::get_last_char_advance(); 
+			// 安全装置：もし歩幅が0なら、文字コードから推測してフリーズを防ぐ
+			if (actual_advance == 0) {
+				actual_advance = (code <= 0xFF) ? 6 : char_w;
+			}
+			// 4. 焼き上がったドットを baseimg に一粒ずつ丁寧に転写
+			for (u32 y = 0; y < char_h; y++) {
+				for (u32 x = 0; x < char_w; x++) {
+					int src_idx = (y * char_w + x) * 4;
+					u8 a = char_rgba[src_idx + 3]; // FreeTypeのアルファ値
+					
+					if (a > 0) {
+						// 職人のこだわり：白文字(255,255,255)にAAのアルファを乗せる
+						baseimg->setPixel(cursor_x + x, y, video::SColor(a, 0, 0, 0));
+					}
+				}
+			}
+		} else {
+			// 無限ループ防止
+			actual_advance = (code <= 0xFF) ? 6 : char_w;
+		}
+		// 次の文字へ進む
+		cursor_x += actual_advance;
+	}
+	*/
 }
  

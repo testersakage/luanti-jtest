@@ -136,6 +136,12 @@ endif()
 
 if(BUILD_CLIENT)
 	find_package(Freetype REQUIRED)
+	find_package(SDL3 REQUIRED)
+
+	include_directories(
+		${FREETYPE_INCLUDE_DIRS}
+		${SDL3_INCLUDE_DIRS}
+	)
 endif()
 
 option(ENABLE_CURSES "Enable ncurses console" ${BUILD_SERVER})
@@ -637,6 +643,19 @@ if(APPLE)
 endif()
 
 if(BUILD_CLIENT)
+
+	if(WIN32)
+		# 1. コンパイル時に「俺がメインだ」と言わせない
+		add_definitions(-DSDL_MAIN_HANDLED)
+
+		# 2. SDL2main をリンク対象から物理的に「抹消」する
+		# (find_package が勝手に追加するのを防ぎます)
+		set(SDL2_LIBRARIES "SDL2") 
+
+		# 3. リンカに対して「SDL2main は無視しろ」と直接命令する
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--undefined=SDL_MAIN_HANDLED")
+	endif()
+
 	# client target
 	if(ANDROID)
 		add_library(${PROJECT_NAME} SHARED)
@@ -690,7 +709,6 @@ if(BUILD_CLIENT)
 		${client_SRCS}
 		${extra_windows_SRCS}
 	)
-
 	target_link_libraries(
 		${PROJECT_NAME}
 		${ZLIB_LIBRARIES}

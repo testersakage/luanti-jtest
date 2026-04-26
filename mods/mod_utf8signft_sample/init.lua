@@ -1,13 +1,21 @@
-local S = minetest.get_translator("mod_utf8sign_sample")
+local S = minetest.get_translator("mod_utf8signft_sample")
 
 -- --- 1. C++エンジンへの物差し通知 ---
 if minetest.utf8sign then
 	minetest.utf8sign.set_config({
-		width = 115,
-		line_height = 14,
-		max_lines = 4,
-		char_w = 5,
-		padding_x = 4
+		ft = {
+			ttf_name = "C:/Windows/Fonts/msgothic.ttc",
+			font_index = 2,
+
+			font_size = 16,
+			baseline = 14,
+			antialias   = false,
+
+			sign_width = 115,
+			line_height = 18,
+			max_lines = 4,
+			char_w_base = 5
+		}
 	})
 end
 
@@ -38,22 +46,25 @@ end
 -- 文字更新用の関数
 local function update_sign_visual(pos, text)
 	local tex = {"utf8_blank.png"}
+
 	if text ~= "" then
-		-- 115x82キャンバス、左余白15、上余白14、黒色
-		tex = "[utf8combine:115x82:15,14@000000=" .. text .. "]"
+		-- 文字列を数字の列に変換！ "あ" -> "12345"
+		local spec_list = table.concat({ utf8.codepoint(text, 1, -1) }, ",")
+		tex = "[utf8combineft:115x82:8,4@000000:UTF8:" .. spec_list .. "]"
+		print("DEBUG_LUA_TEX: " .. tex) -- これをターミナルに表示させる
 	end
 
 	local objects = minetest.get_objects_inside_radius(pos, 0.5)
 	for _, obj in ipairs(objects) do
 		local ent = obj:get_luaentity()
-		if ent and ent.name == "mod_utf8sign_sample:text_entity" then
+		if ent and ent.name == "mod_utf8signft_sample:text_entity" then
 			obj:set_properties({textures = {tex}})
 		end
 	end
 end
 
 -- --- 3. 文字表示プレート(Entity)の定義 ---
-minetest.register_entity("mod_utf8sign_sample:text_entity", {
+minetest.register_entity("mod_utf8signft_sample:text_entity", {
 	visual = "upright_sprite",
 --	visual_size = {x = 0.85, y = 0.85}, 
 	visual_size = {x = 0.875, y = 0.625}, 
@@ -76,10 +87,10 @@ minetest.register_entity("mod_utf8sign_sample:text_entity", {
 })
 
 -- --- 4. 看板登録用ヘルパー ---
-local function register_utf8_sign(material, desc, groups, sounds)
+local function register_utf8_signft(material, desc, groups, sounds)
 	-- soundsが渡されていない（nil）場合の安全装置
 	sounds = sounds or {}
-	minetest.register_node("mod_utf8sign_sample:sign_" .. material, {
+	minetest.register_node("mod_utf8signft_sample:sign_" .. material, {
 		description = desc,
 		drawtype = "nodebox",
 		tiles = {"utf8_sign_wall_" .. material .. ".png"},
@@ -108,9 +119,21 @@ local function register_utf8_sign(material, desc, groups, sounds)
 		on_construct = function(pos)
 			local node = minetest.get_node(pos)
 			local d = get_sign_offsets_and_rot(node.param2)
-			local obj = minetest.add_entity({x = pos.x + d.x, y = pos.y + d.y, z = pos.z + d.z}, "mod_utf8sign_sample:text_entity")
+			local obj = minetest.add_entity({x = pos.x + d.x, y = pos.y + d.y, z = pos.z + d.z}, "mod_utf8signft_sample:text_entity")
 			if obj then obj:set_rotation({x = d.pitch, y = d.yaw, z = 0}) end
-			minetest.get_meta(pos):set_string("formspec", "field[text;書き込む内容;${text}]")
+
+			local formspec = 
+				"formspec_version[6]" ..
+				"size[5.5,5.5]" .. -- ウィンドウ全体を少しコンパクトに
+				"real_coordinates[true]" ..
+				-- ラベル：上端から少し余裕を持たせる
+				"label[0.5,0.7;看板に書き込む内容 (4行まで):]" ..
+				-- 入力欄：画像通りの「どっしり」した広さ
+				"textarea[1.0,1.2;3.5,2.0;text;;${text}]" ..
+				-- 決定ボタン：下側にゆったり配置
+				"button_exit[1.5,4.2;2.5,0.8;save;決定]"			minetest.get_meta(pos):set_string("formspec", formspec)
+			minetest.get_meta(pos):set_string("text", "")
+
 		end,
 
 		on_destruct = function(pos)
@@ -119,7 +142,7 @@ local function register_utf8_sign(material, desc, groups, sounds)
 			for _, obj in ipairs(objects) do
 				local ent = obj:get_luaentity()
 				-- 自分のModのエンティティなら問答無用で削除
-				if ent and ent.name == "mod_utf8sign_sample:text_entity" then
+				if ent and ent.name == "mod_utf8signft_sample:text_entity" then
 					obj:remove()
 				end
 			end
@@ -157,13 +180,13 @@ elseif minetest.get_modpath("mcl_sounds") then
 end
 
 -- 木の看板
-register_utf8_sign("wood", S("UTF-8 Wooden Sign"), 
+register_utf8_signft("wood", S("UTF-8 Wooden Sign (FreeType)"), 
 	{choppy = 2, attached_node = 1, flammable = 2, oddly_breakable_by_hand = 3},
 --	default.node_sound_wood_defaults())
 	wood_sounds)
 
 -- 鉄の看板
-register_utf8_sign("steel", S("UTF-8 Steel Sign"), 
+register_utf8_signft("steel", S("UTF-8 Steel Sign (FreeType)"), 
 	{cracky = 2, attached_node = 1},
 --	default.node_sound_metal_defaults())
 	steel_sounds)

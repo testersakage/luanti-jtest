@@ -53,6 +53,7 @@ set(client_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/fontengine.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utf8_fontengine.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/utf8_fontatlas.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/sdl2_font.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/game.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/gameui.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/game_formspec.cpp
