@@ -1,0 +1,53 @@
+------------------------------
+## UTF8Sign API Reference
+This document covers both the Glyph Cache Management and the Unicode Utility API provided by the high-performance font engine.
+## 1. Cache Management API
+Manage the internal FreeType glyph cache to balance performance and memory.
+## minetest.utf8sign.get_cache_count()
+Returns the number of unique glyphs currently stored in memory.
+
+* Returns: number
+
+## minetest.utf8sign.get_cache_size()
+Returns the current maximum capacity of the cache.
+
+* Returns: number
+
+## minetest.utf8sign.set_cache_size(size)
+Updates the cache capacity (Clamped 0 to 2048).
+
+* Parameters: size (number)
+
+## minetest.utf8sign.clear_cache()
+Flushes the entire glyph cache.
+------------------------------
+## 2. Unicode Utility API
+Highly optimized C++ functions for UTF-8 string manipulation, layout calculation, and East Asian Width (EAW) support.
+## String Property Functions
+
+* utf8.len(s): Returns the number of characters (not bytes) in a UTF-8 string.
+* utf8.offset(s, n, [i]): Returns the byte position of the n-th character.
+* utf8.codepoint(s, [i], [j]): Returns the codepoints of the characters between i and j.
+* utf8.char(...): Converts codepoints to a UTF-8 string.
+* utf8.codes(s): Returns an iterator for UTF-8 codepoints (similar to utf8.codes).
+
+## Layout & Width Calculation
+
+* utf8.get_width(s): Returns the total pixel width of the string using the current FreeType metrics.
+* utf8.eaw_width(s): Returns the East Asian Width (Half-width = 1, Full-width = 2) of the string.
+* utf8.get_lines(s, max_w): Splits a string into multiple lines based on pixel width max_w. Returns a table of strings.
+* utf8.to_table(s): Explodes a UTF-8 string into a table of individual characters.
+
+## Truncation & Wrapping
+
+* utf8.truncate(s, max_w): Truncates a string to fit within max_w pixels.
+* utf8.eaw_truncate(s, max_eaw): Truncates a string based on East Asian Width (e.g., for terminal-like displays).
+* utf8.charpattern: The Lua pattern for a single UTF-8 character ("[\0-\x7F\xC2-\xF4][\x80-\xBF]*").
+
+------------------------------
+## 3. Global Config API
+## minetest.utf8sign.get_config()
+Returns the current engine settings (path, size, baseline, etc.).
+## minetest.utf8sign.set_config(table)
+Updates the font engine settings. Triggers a cache clear if font_size or ttf_name is changed.
+------------------------------
