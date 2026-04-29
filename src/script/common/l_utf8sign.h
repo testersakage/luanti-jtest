@@ -29,6 +29,12 @@ struct UTF8AtlasConfig {
 	u32 ex_char_w_base = 5;
 };
 
+enum class SignBlendMode : int {
+	OVERWRITE = 0, // パキパキドット
+	ALPHA     = 1, // アルファ合成
+	MULTIPLY  = 2  // 乗算（インク染み込み）
+};
+
 // FreeType(新) 看板用 構造体
 struct UTF8FTConfig {
 	// Font File
@@ -48,6 +54,10 @@ struct UTF8FTConfig {
 	u32 char_w_base = 5;
 	u32 padding_x = 0;
 	u32 padding_y = 0;
+	SignBlendMode blend_mode = SignBlendMode::OVERWRITE; // デフォルトは上書き
+
+	// Cache Setting
+	u32 cache_size = 256; 
 
 	// 診断用
 	std::string last_ft_error = "None";
@@ -71,7 +81,7 @@ public:
 	u32 getTextWidth(const std::string &text);
 
 private:
-	UTF8SignManager() {}
+	UTF8SignManager();
 	static UTF8SignManager *m_instance;
 };
 

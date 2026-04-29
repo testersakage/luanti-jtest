@@ -4,20 +4,25 @@ local S = minetest.get_translator("mod_utf8signft_sample")
 if minetest.utf8sign then
 	minetest.utf8sign.set_config({
 		ft = {
-			ttf_name = "C:/Windows/Fonts/msgothic.ttc",
-			font_index = 2,
+			ttf_name = "E:/Fonts/ipagp.ttf", -- IPA Gothic
+--			ttf_name = "E:/Fonts/ipamp.ttf", -- IPA Mincho
+--			ttf_name = "C:/Windows/Fonts/msgothic.ttc",
+--			font_index = 2,
 
-			font_size = 16,
-			baseline = 14,
+			font_size = 32,
+			baseline_y = 28,
 			antialias   = false,
 
-			sign_width = 115,
-			line_height = 18,
+			line_height = 36,
 			max_lines = 4,
-			char_w_base = 5
+			char_w_base = 16,
+			blend_mode = 0, -- ALPHA
 		}
 	})
 end
+
+--定数
+SIGN_WIDTH = 230 -- 看板文字用テクスチャのサイズ（幅）
 
 -- sound setting
 local sounds = {}
@@ -50,7 +55,7 @@ local function update_sign_visual(pos, text)
 	if text ~= "" then
 		-- 文字列を数字の列に変換！ "あ" -> "12345"
 		local spec_list = table.concat({ utf8.codepoint(text, 1, -1) }, ",")
-		tex = "[utf8combineft:115x82:8,4@000000:UTF8:" .. spec_list .. "]"
+		tex = "[utf8combineft:" .. SIGN_WIDTH .. "x164:16,8@FF0000:UTF8:" .. spec_list .. "]"
 		print("DEBUG_LUA_TEX: " .. tex) -- これをターミナルに表示させる
 	end
 

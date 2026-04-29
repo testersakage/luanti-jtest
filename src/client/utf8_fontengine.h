@@ -5,8 +5,22 @@
 #include <IImage.h>
 #include <string>
 #include <vector>
+#include <map>    // 追加
 
 struct RenderTask; 
+
+// 生成されたピクセルデータと寸法をセットで保存する
+struct FTCachedGlyph {
+	std::vector<u8> bitmap; // 実際のピクセルデータ
+	u32 width;			// 文字が描かれている有効なピクセル幅
+	u32 rows;			// 文字が描かれている有効なピクセルの行数
+	int pitch;			// 画像データの「一行が何バイトか」を表す
+	int bitmap_left;	// (左余白): ペン先から、右に何ピクセル離れて描き始めるか。
+	int bitmap_top;		// (上からの浮き): ベースラインから、上に何ピクセル突き出しているか。
+	u32 advance;		//(文字送り): 次の文字のためにペン先を右に何ピクセル進めるか
+	u8 pixel_mode;		// Mode (GRAY か MONO か)を記録
+};
+
 // ★ ここに「前方宣言」を追加
 class UTF8FontAtlas; 
 
@@ -54,6 +68,10 @@ public:
 	 * 仮想スクリーンバッファ方式により、フォントの種類を問わずキャプチャ可能です。
 	 */
 	static void* getGlyphImage(wchar_t c);
+	
+	/* FreeType Cache API */
+	static u32 getCacheCount();
+	static void clearCache();
 
 private:
 	// ★ ここに「倉庫番」を配属します
@@ -61,5 +79,11 @@ private:
 
 	// render関数のパース処理担当
 	static RenderTask parseUtf8Spec(const std::string &spec);
+
+	// FreeType Cahe制御
+	static FTCachedGlyph* getOrCacheGlyph(u32 code, void* face_ptr, u32 load_flags);
+
+	// FreeType Caheメモリ 64bit長で fontsize+code を鍵とする
+	static std::map<u64, FTCachedGlyph> m_glyph_cache;
 
 };

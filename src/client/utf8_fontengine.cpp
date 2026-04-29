@@ -16,6 +16,9 @@
 #include "../utf8_53.h"		// あなたが作った UTF-8 ロジック
 #include "../script/common/l_utf8sign.h"		// 追加
 
+#include <ft2build.h>
+#include FT_FREETYPE_H 
+
 #include <IVideoDriver.h> 
 #include <ITexture.h> 
 #include "renderingengine.h"
@@ -34,9 +37,11 @@
 #include "sdl2_font.h" // これを忘れずに
 
 struct RenderTask { // TTF用の構造体
-    std::vector<u32> codes;
-    u32 start_x = 0;
-    u32 start_y = 0;
+	std::vector<u32> codes;
+	u32 start_x = 0;
+	u32 start_y = 0;
+	u32 sign_width = 0; 
+	video::SColor color = video::SColor(255, 0, 0, 0); // デフォルト黒
 };
 
 UTF8FontEngine::UTF8FontEngine()
@@ -207,14 +212,10 @@ void* UTF8FontEngine::getGlyphImage(wchar_t c)
 			}
 		}
 	}
-
 	// 6. 使い終わったテクスチャを消去
 	driver->removeTexture(render_tex);
-
 	return (void*)glyph_img;
 }
-
-
 
 
 // UTF8FontEngine.cpp 内の parseUtf8Spec
@@ -226,17 +227,30 @@ RenderTask UTF8FontEngine::parseUtf8Spec(const std::string &spec)
 	size_t coord_pos = spec.find(":", size_pos + 1);
 	size_t color_pos = spec.find("@", coord_pos + 1);
 
+	size_t utf8_pos = spec.find("UTF8:", color_pos != std::string::npos ? color_pos : coord_pos);
+
+	// --- 座標のパース ---
 	if (coord_pos != std::string::npos && color_pos != std::string::npos) {
 		std::string coords = spec.substr(coord_pos + 1, color_pos - (coord_pos + 1));
 		size_t comma = coords.find(",");
 		if (comma != std::string::npos) {
-			// ここで開始座標(例: 15, 14)を取得！
-			u32 start_x = std::stoul(coords.substr(0, comma));
-			u32 start_y = std::stoul(coords.substr(comma + 1));
+			task.start_x = std::stoul(coords.substr(0, comma));
+			task.start_y = std::stoul(coords.substr(comma + 1));
+		}
+	}
 
-			// これを cursor_x, cursor_y の初期値にセットする
-			task.start_x = start_x;
-			task.start_y = start_y;
+	// --- 色のパース (@RRGGBB形式) ---
+	if (color_pos != std::string::npos && utf8_pos != std::string::npos) {
+		// "@" の直後から "UTF8:" の手前までを切り出す
+		std::string hex_str = spec.substr(color_pos + 1, utf8_pos - (color_pos + 2)); // ":" を考慮
+		if (hex_str.length() >= 6) {
+			try {
+				u32 color_val = std::stoul(hex_str.substr(0, 6), nullptr, 16);
+				task.color = video::SColor(255, 
+					(color_val >> 16) & 0xFF, 
+					(color_val >> 8) & 0xFF, 
+					color_val & 0xFF);
+			} catch (...) {}
 		}
 	}
 
@@ -264,6 +278,60 @@ RenderTask UTF8FontEngine::parseUtf8Spec(const std::string &spec)
 	return task;
 }
 
+
+// 実体宣言
+std::map<u64, FTCachedGlyph> UTF8FontEngine::m_glyph_cache;
+
+FTCachedGlyph* UTF8FontEngine::getOrCacheGlyph(u32 code, void* face_ptr, u32 load_flags) {
+	UTF8FTConfig &cfg = UTF8SignManager::getInstance()->ft;
+	u64 cache_key = ((u64)cfg.font_size << 32) | (u64)code;
+	
+	FT_Face face = (FT_Face)face_ptr;
+	auto it = m_glyph_cache.find(cache_key);
+	if (it != m_glyph_cache.end()) {
+#if FT_DEBUG_VIEW
+		actionstream << "FT_CACHE: Memory Load Key=" << cache_key << std::endl;
+#endif
+		return &it->second;
+	}
+
+	// --- Cacheになければ FreeType に最高の状態で焼かせる ---
+	if (FT_Load_Char(face, code, load_flags)) return nullptr;
+
+	FT_GlyphSlot slot = face->glyph;
+	FTCachedGlyph &cg = m_glyph_cache[cache_key];
+
+	// ピクセルデータを丸ごとCacheへ転写
+	u32 size = slot->bitmap.rows * slot->bitmap.pitch;
+	if (size > 0) {
+		cg.bitmap.assign(slot->bitmap.buffer, slot->bitmap.buffer + size);
+	}
+
+	// 寸法とモードを完璧に記録
+	cg.width       = slot->bitmap.width;
+	cg.rows        = slot->bitmap.rows;
+	cg.pitch       = slot->bitmap.pitch;
+	cg.bitmap_left = slot->bitmap_left;
+	cg.bitmap_top  = slot->bitmap_top;
+	cg.advance     = (u32)(slot->advance.x >> 6);
+	cg.pixel_mode  = slot->bitmap.pixel_mode;
+
+#if FT_DEBUG_VIEW
+	actionstream << "FT_CACHE: Stored Key=" << cache_key << " (" << cg.width << "x" << cg.rows << ")" << std::endl;
+#endif
+	return &cg;
+}
+
+// FreeType Cache
+u32 UTF8FontEngine::getCacheCount() {
+    return (u32)m_glyph_cache.size();
+}
+
+// FreeType Cache
+void UTF8FontEngine::clearCache() {
+    m_glyph_cache.clear();
+    actionstream << "FT_CACHE: Manual Clear." << std::endl;
+}
 
 
 // 関数 UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
@@ -394,7 +462,6 @@ void UTF8FontEngine::renderutf8combineft(video::IImage *baseimg, const std::stri
 
 	UTF8FTConfig &cfg = UTF8SignManager::getInstance()->ft;
 
-	// --- 職人の「心変わり」チェック ---
 	// 現在読み込み済みの情報と、最新の設定を突き合わせる
 	bool needs_init = false;
 	if (sdl2_font::get_library_ptr() == nullptr) {
@@ -411,9 +478,9 @@ void UTF8FontEngine::renderutf8combineft(video::IImage *baseimg, const std::stri
 		sdl2_font::init(cfg.ttf_name, cfg.font_size, cfg.font_index);
 	}
 
-	u32 baseline = cfg.baseline_y;
-	bool aa      = cfg.antialias;
-	u32 f_size   = cfg.font_size;
+//	u32 baseline = cfg.baseline_y;
+//	bool aa      = cfg.antialias;
+//	u32 f_size   = cfg.font_size;
 
 	if (sdl2_font::get_library_ptr() == nullptr) {
 		std::string font_path = g_settings->get("utf8_font_path");
@@ -422,25 +489,6 @@ void UTF8FontEngine::renderutf8combineft(video::IImage *baseimg, const std::stri
 		sdl2_font::init(font_path, cfg.font_size, cfg.font_index);
 	}
 
-
-/*
-	UTF8FTConfig &cfg = UTF8SignManager::getInstance()->ft;
-
-	// 全ての設定を Config から奪い取る
-	u32 baseline = cfg.baseline_y;
-	bool aa      = cfg.antialias;
-	u32 f_size   = cfg.font_size;
-
-	// --- フォント設定の遅延初期化（sdl2_fontdでは初期化できないから） ---
-	if (sdl2_font::get_library_ptr() == nullptr) {
-		// minetest.confからフォントパスを取得して初期化
-		std::string font_path = g_settings->get("utf8_font_path");
-//		if (font_path.empty()) font_path = "NotoSansMonoCJKjp-Regular.otf";
-//		u16 f_size = cfg.font_size;
-
-		sdl2_font::init(font_path, f_size);
-	}
-*/
 
 	// ---------------------------------------------------------
 
@@ -486,9 +534,6 @@ void UTF8FontEngine::renderutf8combineft(video::IImage *baseimg, const std::stri
 			baseimg->setPixel(x, y, video::SColor(255, 0, 0, 0));
 #endif
 
-//	std::vector<u32> codes = parseUtf8Spec(spec);
-//	if (codes.empty()) return;
-
 
 	// パース結果をローカルな変数「task」として受け取る
 	RenderTask task = parseUtf8Spec(spec);
@@ -498,9 +543,9 @@ void UTF8FontEngine::renderutf8combineft(video::IImage *baseimg, const std::stri
 	u32 cursor_x = (task.start_x == 0) ? cfg.padding_x : task.start_x;
 	u32 cursor_y = (task.start_y == 0) ? cfg.padding_y : task.start_y;
 	u32 line_height = cfg.line_height; // ★1行の高さ（器の高さ）
-	u32 max_w = baseimg->getDimension().Width;
+	u32 max_w = (task.sign_width > 0) ? task.sign_width : baseimg->getDimension().Width;
 	u32 max_h = baseimg->getDimension().Height;
-//	const bool use_aa = true; // まずは最高画質のアンチエイリアスONで！
+	video::SColor target_color = task.color;
 
 	for (u32 code : task.codes) {
 		// 1. 改行コード(10)が来たら、問答無用で次へ
@@ -521,71 +566,43 @@ void UTF8FontEngine::renderutf8combineft(video::IImage *baseimg, const std::stri
 		if (cursor_y + line_height > max_h) break;
 
 		// --- (ここから描画処理) ---
-		u8 char_rgba[32 * 32 * 4] = {0}; // 高さは18px確保
-		if (sdl2_font::render_to_buffer(code, char_rgba, 32, 32, aa, f_size, baseline)) {
-			u32 advance = sdl2_font::get_last_char_advance();
+		FT_Face face = (FT_Face)sdl2_font::get_face_ptr();
+		if (!face) continue;
 
-			// 転写時に cursor_y を加味する
-			for (u32 y = 0; y < cfg.line_height; y++) {
-				for (u32 x = 0; x < (cfg.font_size + 8); x++) {
-					int src_idx = (y * 32 + x) * 4;
-					u8 a = char_rgba[src_idx + 3];
-					if (a > 0) {
-						// ★ cursor_y を足して、正しい行に描く
-						baseimg->setPixel(cursor_x + x, cursor_y + y, video::SColor(a, 0, 0, 0));
-					}
+		// 1. 【Cacheから出す】
+		// アンチエイリアス設定などを反映したロードフラグを準備
+		u32 load_flags = FT_LOAD_RENDER | (cfg.antialias ? FT_LOAD_TARGET_NORMAL : FT_LOAD_TARGET_MONO);
+		FTCachedGlyph* cg = getOrCacheGlyph(code, face, load_flags);
+		if (!cg) continue;
+
+		// 2. 【転写】Cacheにあるピクセルを看板に直接刻む
+		for (u32 y = 0; y < cg->rows; y++) {
+			for (u32 x = 0; x < cg->width; x++) {
+				u8 alpha = 0;
+				// モードに応じてアルファ値を抽出
+				if (cg->pixel_mode == FT_PIXEL_MODE_GRAY) {
+					alpha = cg->bitmap[y * cg->pitch + x];
+				} else if (cg->pixel_mode == FT_PIXEL_MODE_MONO) {
+					u8 byte = cg->bitmap[y * cg->pitch + (x / 8)];
+					alpha = (byte & (0x80 >> (x % 8))) ? 255 : 0;
+				}
+
+				if (alpha == 0) continue;
+
+				// ベクターの時に学んだ「黄金の座標計算」
+				int tx = (int)cursor_x + cg->bitmap_left + (int)x;
+				int ty = (int)cursor_y + ((int)cfg.baseline_y - cg->bitmap_top) + (int)y;
+
+				if (tx >= 0 && ty >= 0 && tx < (int)max_w && ty < (int)max_h) {
+					// 以前決めた target_color で描画
+					baseimg->setPixel((u32)tx, (u32)ty, 
+						video::SColor(alpha, target_color.getRed(), target_color.getGreen(), target_color.getBlue()));
 				}
 			}
-			cursor_x += advance;
 		}
+		// 3. 【進む】文字送りもCacheから
+		cursor_x += cg->advance;
 	}
 
-
-	/*
-	// 2. 看板の「物理規格」を定義 (SignManagerの黄金比を継承)
-	const u32 char_w = 12;
-	const u32 char_h = 14;
-	const bool use_aa = true; // まずは最高画質のアンチエイリアスONで！
-
-	u32 cursor_x = 0;
-	u32 max_w = baseimg->getDimension().Width;
-
-	u32 actual_advance = 0; // ここで宣言しておけば else でも見える
-	for (u32 code : codes) {
-		// 看板からはみ出すなら終了
-		if (cursor_x + char_w > max_w) break;
-
-		// 1文字分のRGBA作業バッファ
-		u8 char_rgba[char_w * char_h * 4] = {0};
-
-		// 3. FreeTypeで「12x14の器」に文字を焼く
-		// ここで 11pxベースライン合わせ が自動で行われる
-		if (sdl2_font::render_to_buffer(code, char_rgba, char_w, char_h, use_aa)) {
-			// フォントから歩幅を取得
-			actual_advance = sdl2_font::get_last_char_advance(); 
-			// 安全装置：もし歩幅が0なら、文字コードから推測してフリーズを防ぐ
-			if (actual_advance == 0) {
-				actual_advance = (code <= 0xFF) ? 6 : char_w;
-			}
-			// 4. 焼き上がったドットを baseimg に一粒ずつ丁寧に転写
-			for (u32 y = 0; y < char_h; y++) {
-				for (u32 x = 0; x < char_w; x++) {
-					int src_idx = (y * char_w + x) * 4;
-					u8 a = char_rgba[src_idx + 3]; // FreeTypeのアルファ値
-					
-					if (a > 0) {
-						// 職人のこだわり：白文字(255,255,255)にAAのアルファを乗せる
-						baseimg->setPixel(cursor_x + x, y, video::SColor(a, 0, 0, 0));
-					}
-				}
-			}
-		} else {
-			// 無限ループ防止
-			actual_advance = (code <= 0xFF) ? 6 : char_w;
-		}
-		// 次の文字へ進む
-		cursor_x += actual_advance;
-	}
-	*/
 }
  

@@ -1,3 +1,4 @@
+// src/client/sdl2_font.cpp
 #define SDL_MAIN_HANDLED
 #include "sdl2_font.h"
 #include <SDL2/SDL.h>
@@ -7,28 +8,28 @@
 //#include <iostream> // これを追加 debug表示用
 namespace sdl2_font {
 
-static FT_Library ft_library = nullptr;
-static FT_Face ft_face = nullptr;
-static int last_ft_error = 0; // ★これを追加！
-static u32 last_char_advance = 0; // 歩幅を記録する箱
-static std::string last_attempted_path = "";
+	static FT_Library ft_library = nullptr;
+	static FT_Face ft_face = nullptr;
+	static int last_ft_error = 0; // ★これを追加！
+	static u32 last_char_advance = 0; // 歩幅を記録する箱
+	static std::string last_attempted_path = "";
 
-u32 get_last_char_advance() { return last_char_advance; }
+	u32 get_last_char_advance() { return last_char_advance; }
 
-void* get_library_ptr() { return (void*)ft_library; }
-void* get_face_ptr()    { return (void*)ft_face; }
-int get_last_error() { return last_ft_error; }
-std::string get_last_path() { return last_attempted_path; }
+	void* get_library_ptr() { return (void*)ft_library; }
+	void* get_face_ptr()    { return (void*)ft_face; }
+	int get_last_error() { return last_ft_error; }
+	std::string get_last_path() { return last_attempted_path; }
 
-// ★ 職人の備忘録：現在ロード中の設定をメモしておく
-static std::string loaded_path = "";
-static unsigned int loaded_size = 0;
-static int loaded_index = -1;
+	// ★ 職人の備忘録：現在ロード中の設定をメモしておく
+	static std::string loaded_path = "";
+	static unsigned int loaded_size = 0;
+	static int loaded_index = -1;
 
-// --- 外部から現在の状態を自白させるための関数 ---
-//std::string get_last_path()  { return last_attempted_path; }
-unsigned int get_last_size() { return loaded_size; }
-int get_last_index()         { return loaded_index; }
+	// --- 外部から現在の状態を自白させるための関数 ---
+	//std::string get_last_path()  { return last_attempted_path; }
+	unsigned int get_last_size() { return loaded_size; }
+	int get_last_index()         { return loaded_index; }
 
 
 bool init(const std::string &font_path, unsigned int font_size, int requested_index)
