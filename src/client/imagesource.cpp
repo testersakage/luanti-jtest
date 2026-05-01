@@ -1039,7 +1039,6 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 	else
 	{
 		// A special texture modification
-
 		/*
 			[crack[o][:<tiles>]:<frame_count>:<frame>
 			Adds a cracking texture
@@ -1086,6 +1085,13 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 
 		else if (str_starts_with(part_of_name, "[utf8combineft")) // ★第二章：純粋TTF版の窓口
 		{
+#if UTF8_DEBUG
+			if (str_starts_with(part_of_name, "[utf8combineft")) {
+    actionstream << "DEBUG_COMPARE: MATCHED FT!" << std::endl;
+} else if (str_starts_with(part_of_name, "[utf8combine")) {
+    actionstream << "DEBUG_COMPARE: MATCHED ATLAS!" << std::endl;
+}
+#endif
 			Strfnd sf(part_of_name);
 			sf.next(":");
 			u32 w0 = stoi(sf.next("x"));
@@ -1114,6 +1120,13 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 		*/
 		else if (str_starts_with(part_of_name, "[utf8combine"))
 		{
+#if UTF8_DEBUG
+if (str_starts_with(part_of_name, "[utf8combineft")) {
+    actionstream << "DEBUG_COMPARE: MATCHED FT!" << std::endl;
+} else if (str_starts_with(part_of_name, "[utf8combine")) {
+    actionstream << "DEBUG_COMPARE: MATCHED ATLAS!" << std::endl;
+}
+#endif
 			Strfnd sf(part_of_name);
 			sf.next(":");
 			u32 w0 = stoi(sf.next("x"));
@@ -1121,7 +1134,7 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 
 			// 安全装置：2048pxを上限として、巨大すぎるリクエストからシステムを守る
 			if (w0 > 2048 || h0 > 2048) {
-				errorstream << "utf8combineft: Image size (" << w0 << "x" << h0 << ") exceeds limit (2048)!" << std::endl;
+				errorstream << "utf8combine: Image size (" << w0 << "x" << h0 << ") exceeds limit (2048)!" << std::endl;
 				return false;
 			}
 

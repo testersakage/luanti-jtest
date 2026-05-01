@@ -337,6 +337,8 @@ void UTF8FontEngine::clearCache() {
 // 関数 UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 {
+	actionstream << "DEBUG_ENGINE: Old Atlas Engine Called!" << std::endl;
+
 	if (!m_atlas) m_atlas = new UTF8FontAtlas();
 	if (!dest_img_ptr) return;
 	video::IImage *dest_img = reinterpret_cast<video::IImage*>(dest_img_ptr);
@@ -458,6 +460,8 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 // Render UTF-8 Combine FreeType
 void UTF8FontEngine::renderutf8combineft(video::IImage *baseimg, const std::string &spec)
 {
+	actionstream << "DEBUG_ENGINE: New FT Engine Called!" << std::endl;
+
 	if (!baseimg) return;
 
 	UTF8FTConfig &cfg = UTF8SignManager::getInstance()->ft;

@@ -1,3 +1,4 @@
+-- mod_utf8sign_sample/init.lua
 local S = minetest.get_translator("mod_utf8sign_sample")
 
 -- --- 1. C++エンジンへの物差し通知 ---
@@ -41,6 +42,7 @@ local function update_sign_visual(pos, text)
 	if text ~= "" then
 		-- 115x82キャンバス、左余白15、上余白14、黒色
 		tex = "[utf8combine:115x82:15,14@000000=" .. text .. "]"
+		print("DEBUG_LUA_TEX: " .. tex) -- これをターミナルに表示させる
 	end
 
 	local objects = minetest.get_objects_inside_radius(pos, 0.5)
@@ -110,7 +112,20 @@ local function register_utf8_sign(material, desc, groups, sounds)
 			local d = get_sign_offsets_and_rot(node.param2)
 			local obj = minetest.add_entity({x = pos.x + d.x, y = pos.y + d.y, z = pos.z + d.z}, "mod_utf8sign_sample:text_entity")
 			if obj then obj:set_rotation({x = d.pitch, y = d.yaw, z = 0}) end
-			minetest.get_meta(pos):set_string("formspec", "field[text;書き込む内容;${text}]")
+
+			local formspec = 
+				"formspec_version[6]" ..
+				"size[5.5,5.5]" .. -- ウィンドウ全体を少しコンパクトに
+				"real_coordinates[true]" ..
+				-- ラベル：上端から少し余裕を持たせる
+				"label[0.5,0.7;看板に書き込む内容 (4行まで):]" ..
+				-- 入力欄：画像通りの「どっしり」した広さ
+				"textarea[1.0,1.2;3.5,2.0;text;;${text}]" ..
+				-- 決定ボタン：下側にゆったり配置
+				"button_exit[1.5,4.2;2.5,0.8;save;決定]"
+			minetest.get_meta(pos):set_string("formspec", formspec)
+			minetest.get_meta(pos):set_string("text", "")
+
 		end,
 
 		on_destruct = function(pos)

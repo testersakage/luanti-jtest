@@ -55,7 +55,7 @@ local function update_sign_visual(pos, text)
 	if text ~= "" then
 		-- 文字列を数字の列に変換！ "あ" -> "12345"
 		local spec_list = table.concat({ utf8.codepoint(text, 1, -1) }, ",")
-		tex = "[utf8combineft:" .. SIGN_WIDTH .. "x164:16,8@FF0000:UTF8:" .. spec_list .. "]"
+		tex = "[utf8combineft:" .. SIGN_WIDTH .. "x164:16,8@000000:UTF8:" .. spec_list .. "]"
 		print("DEBUG_LUA_TEX: " .. tex) -- これをターミナルに表示させる
 	end
 
@@ -136,7 +136,8 @@ local function register_utf8_signft(material, desc, groups, sounds)
 				-- 入力欄：画像通りの「どっしり」した広さ
 				"textarea[1.0,1.2;3.5,2.0;text;;${text}]" ..
 				-- 決定ボタン：下側にゆったり配置
-				"button_exit[1.5,4.2;2.5,0.8;save;決定]"			minetest.get_meta(pos):set_string("formspec", formspec)
+				"button_exit[1.5,4.2;2.5,0.8;save;決定]"
+			minetest.get_meta(pos):set_string("formspec", formspec)
 			minetest.get_meta(pos):set_string("text", "")
 
 		end,
