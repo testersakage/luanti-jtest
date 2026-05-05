@@ -5,7 +5,22 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include "log.h"
+
+#include "porting.h"      // porting::path_user を使うため
+#include "filesys.h"      // fs::PathExists を使うため
+#include "util/string.h"  // DIR_DELIM を使うため（環境によってはこちら）
+#include "settings.h" // これで g_settings が使える
+#include "content/subgames.h" // ゲームリスト取得
+#include "script/common/l_utf8sign.h"
 //#include <iostream> // これを追加 debug表示用
+
+
+// 0=無効 , 1=有効
+#define UTF8_ATLAS 1
+#define UTF8_SDL2_ATLAS 0
+#define UTF8_SDL2_FREETYPE 0
+
+
 namespace sdl2_font {
 
 	static FT_Library ft_library = nullptr;
@@ -84,7 +99,7 @@ bool init(const std::string &font_path, unsigned int font_size, int requested_in
 	// --- 職人の詳細自白ログ ---
 	FT_Int major, minor, patch;
 	FT_Library_Version(ft_library, &major, &minor, &patch);
-
+#if FT_DEBUG
 	actionstream << "SDL2Font: === FT BACKEND READY ===" << std::endl;
 	actionstream << "SDL2Font: FreeType Version: " << major << "." << minor << "." << patch << std::endl;
 	actionstream << "SDL2Font: Family Name: " << (ft_face->family_name ? ft_face->family_name : "Unknown") << std::endl;
@@ -92,12 +107,54 @@ bool init(const std::string &font_path, unsigned int font_size, int requested_in
 	actionstream << "SDL2Font: Face Index:  " << final_index << " / " << num_faces << std::endl;
 	actionstream << "SDL2Font: Pixel Size:  " << font_size << std::endl;
 	actionstream << "SDL2Font: ==========================" << std::endl;
-
+#endif
 	// ★ 成功した瞬間に、今回の設定を「備忘録」に書き込む！
 //	loaded_path  = font_path;
 	loaded_size  = font_size;
 	loaded_index = final_index; // 実際に確定したインデックス
 
+#if UTF8_SDL2_ATLAS
+// asuna check
+	// --- 全ゲームをスキャンして Asuna の蔵を探す ---
+	std::vector<SubgameSpec> games = getAvailableGames(); 
+	std::string detected_atlas_path = "";
+
+	// ★ 1. Asunaの「素性」を定義
+	AtlasDefinition asuna_def;
+	asuna_def.mod_name     = "asuna";
+	asuna_def.sub_path     = std::string("mods") + DIR_DELIM + "signs_lib" + DIR_DELIM + "textures" + DIR_DELIM + "unifont";
+	asuna_def.file_pattern = "signs_lib_uni%02x.png";
+	asuna_def.glyph_size   = 16;
+
+	actionstream << "SDL2Font: Scanning installed games for Atlas resources..." << std::endl;
+
+	for (const auto &spec : games) {
+		// ID（フォルダ名）に asuna が含まれているかチェック
+		if (spec.id.find(asuna_def.mod_name) != std::string::npos) {
+			// spec.path を使って unifont ディレクトリを特定
+			std::string potential_path = spec.path + DIR_DELIM + asuna_def.sub_path;
+			
+			if (fs::PathExists(potential_path + DIR_DELIM + "signs_lib_uni00.png")) {
+				detected_atlas_path = potential_path;
+				actionstream << "SDL2Font: >>> Target Atlas Found in Game: " << spec.id << " <<<" << std::endl;
+
+				// ★ 2. マネージャーの「棚」に登録する
+				UTF8SignManager::getInstance()->registerAtlas(asuna_def, potential_path);
+				break;
+			}
+		}
+	}
+
+	if (detected_atlas_path.empty()) {
+		actionstream << "SDL2Font: No suitable Atlas resource found." << std::endl;
+	}
+// asuna check
+#endif
+
+#if UTF8_SDL2_ATLAS
+	// 外部Atlas が利用可能かの確認
+	UTF8SignManager::getInstance()->loadGrimoire();
+#endif
 	return true;
 }
 

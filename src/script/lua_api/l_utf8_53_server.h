@@ -59,4 +59,11 @@ private:
 	static int l_utf8_eaw_width(lua_State *L);
 	static int l_utf8_eaw_truncate(lua_State *L);
 
+	// --- 物理表示の支配者たち (utf8wrap.*) ---
+	static int l_utf8_eaw_char_width(lua_State *L);
+	static int l_utf8wrap_width(lua_State *L);    // w21. ピクセル幅計測
+	static int l_utf8wrap_truncate(lua_State *L); // w22. 指定幅カット
+	static int l_utf8wrap_wrap(lua_State *L);     // w23. 純粋自動改行
+	static int l_utf8wrap_lines(lua_State *L);    // w24. 看板用ハイブリッド改行
+
 };

@@ -7,8 +7,14 @@
 #include "utf8_53.h"
 #include <stdexcept>
 
-// ★ static メンバ変数の実体定義を忘れずに！
-std::map<int, ImageRGBA> UTF8FontAtlas::m_atlas_pages;
+// 0=無効 , 1=有効
+#define UTF8_ATLAS 1
+#define UTF8_SDL2_ATLAS 0
+#define UTF8_SDL2_FREETYPE 0
+
+
+// static メンバ変数の実体定義を忘れずに！
+//std::map<int, ImageRGBA> UTF8FontAtlas::m_atlas_pages;
 
 // 1. 切り出し関数を可変幅(target_w)対応に
 static ImageRGBA crop_glyph_custom(const ImageRGBA &src, int gx, int gy, int target_w, int target_h)
@@ -90,8 +96,8 @@ static ImageRGBA load_png_rgba(const std::string &path)
 	img->drop();
 	return out;
 }
-
-/* --- 3. ページロード（キャッシュ付き） --- */
+/*
+// --- 3. ページロード（キャッシュ付き） --- 
 const ImageRGBA &UTF8FontAtlas::loadPage(int page)
 {
 	auto it = m_atlas_pages.find(page);
@@ -109,6 +115,48 @@ const ImageRGBA &UTF8FontAtlas::loadPage(int page)
 	m_atlas_pages[page] = std::move(img);
 	return m_atlas_pages[page];
 }
+*/
+
+#if UTF8_ATLAS
+std::map<int, ImageRGBA> UTF8FontAtlas::m_st_pages;
+std::list<int> UTF8FontAtlas::m_st_page_order;
+size_t UTF8FontAtlas::m_st_max_pages = 4;
+
+// STD Atlas 用
+const ImageRGBA &UTF8FontAtlas::loadPage(int page)
+{
+	//  Cache（map）を確認
+	auto it = m_st_pages.find(page);
+	if (it != m_st_pages.end()) return it->second;
+
+	//  Cacheの掃除（FIFO）: 5枚目が必要になったら、一番古い1枚を捨てる
+	while (m_st_pages.size() >= m_st_max_pages && !m_st_page_order.empty()) {
+		int oldest = m_st_page_order.front();
+		m_st_page_order.pop_front();
+		m_st_pages.erase(oldest); 
+		infostream << "UTF8FontAtlas: FIFO Evicted old page: " << oldest << std::endl;
+	}
+
+	//  パス生成（将来のポータビリティを考慮して整理）
+	char filename[512];
+	// ※ここはあなたの環境に合わせて、あるいは後でポータブルなパス取得に置き換え
+	snprintf(filename, sizeof(filename), 
+//		"C:/msys64/home/localuser/luanti/games/mineclonia-jtest/mods/ITEMS/mcl_signs/textures/unicode_page_%02x.png", 
+		"C:/msys64/home/localuser/luanti/mods/mod_utf8sign_sample/textures/unicode_page_%02x.png", 
+//		"unicode_page_%02x.png", 
+		page);
+
+	infostream << "UTF8FontAtlas: Loading new ST-page: " << filename << " (Total: " << m_st_pages.size() + 1 << ")" << std::endl;
+
+	//  ロードと格納（std::move で所有権をスマートに移譲）
+	ImageRGBA img = load_png_rgba(filename);
+	m_st_pages[page] = std::move(img);
+	m_st_page_order.push_back(page);
+
+	return m_st_pages[page];
+}
+#endif
+
 
 /* --- 4. メインの切り出し関数 --- */
 ImageRGBA UTF8FontAtlas::getGlyphImage(int codepoint)
@@ -150,3 +198,9 @@ ImageRGBA UTF8FontAtlas::getGlyphImage(int codepoint)
     // 5. 切り出し実行 (高さは画像の実態に合わせる)
     return crop_glyph_custom(atlas, gx, gy, current_w, actual_line_h);
 }
+
+// st Atlas API Cache count
+u32 UTF8FontAtlas::getPageCache() {
+    return (u32)m_st_pages.size();
+}
+

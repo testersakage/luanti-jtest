@@ -4,7 +4,9 @@ local S = minetest.get_translator("mod_utf8signft_sample")
 if minetest.utf8sign then
 	minetest.utf8sign.set_config({
 		ft = {
-			ttf_name = "E:/Fonts/ipagp.ttf", -- IPA Gothic
+			ttf_name = "E:/Fonts/LanaPixel.ttf", 
+--			ttf_name = "E:/Fonts/Monogram.ttf", 
+--			ttf_name = "E:/Fonts/ipagp.ttf", -- IPA Gothic
 --			ttf_name = "E:/Fonts/ipamp.ttf", -- IPA Mincho
 --			ttf_name = "C:/Windows/Fonts/msgothic.ttc",
 --			font_index = 2,
@@ -13,16 +15,17 @@ if minetest.utf8sign then
 			baseline_y = 28,
 			antialias   = false,
 
-			line_height = 36,
-			max_lines = 4,
-			char_w_base = 16,
+			ft_line_height = 36,
+			ft_max_lines = 4,
+			ft_char_w_han = 16,
+			ft_char_w_zen = 32,
 			blend_mode = 0, -- ALPHA
 		}
 	})
 end
 
 --定数
-SIGN_WIDTH = 230 -- 看板文字用テクスチャのサイズ（幅）
+local FT_SIGN_WIDTH = 230 -- 看板文字用テクスチャのサイズ（幅）
 
 -- sound setting
 local sounds = {}
@@ -50,12 +53,12 @@ end
 
 -- 文字更新用の関数
 local function update_sign_visual(pos, text)
-	local tex = {"utf8_blank.png"}
+	local tex = "utf8_blank.png"
 
 	if text ~= "" then
 		-- 文字列を数字の列に変換！ "あ" -> "12345"
 		local spec_list = table.concat({ utf8.codepoint(text, 1, -1) }, ",")
-		tex = "[utf8combineft:" .. SIGN_WIDTH .. "x164:16,8@000000:UTF8:" .. spec_list .. "]"
+		tex = "[utf8combineft:" .. FT_SIGN_WIDTH .. "x164:16,8@003F00:UTF8:" .. spec_list .. "]"
 		print("DEBUG_LUA_TEX: " .. tex) -- これをターミナルに表示させる
 	end
 
@@ -71,10 +74,8 @@ end
 -- --- 3. 文字表示プレート(Entity)の定義 ---
 minetest.register_entity("mod_utf8signft_sample:text_entity", {
 	visual = "upright_sprite",
---	visual_size = {x = 0.85, y = 0.85}, 
 	visual_size = {x = 0.875, y = 0.625}, 
 	textures = {"utf8_blank.png"}, -- デフォルトは透明
---	textures = {"utf8_test_115.png"}, -- デフォルトは透明
 	physical = false,
 	pointable = false,
 	is_visible = true,
@@ -160,7 +161,6 @@ local function register_utf8_signft(material, desc, groups, sounds)
 			if not fields.save then
 				return
 			end
---			if not fields.quit then return end
 
 			local text = fields.text or ""
 			local meta = minetest.get_meta(pos)
@@ -186,13 +186,11 @@ elseif minetest.get_modpath("mcl_sounds") then
 end
 
 -- 木の看板
-register_utf8_signft("wood", S("UTF-8 Wooden Sign (FreeType)"), 
+register_utf8_signft("wood", S("Wooden Sign (UTF-8 SDL2 FreeType)"), 
 	{choppy = 2, attached_node = 1, flammable = 2, oddly_breakable_by_hand = 3},
---	default.node_sound_wood_defaults())
 	wood_sounds)
 
 -- 鉄の看板
-register_utf8_signft("steel", S("UTF-8 Steel Sign (FreeType)"), 
+register_utf8_signft("steel", S("Steel Sign (UTF-8 SDL2 FreeType)"), 
 	{cracky = 2, attached_node = 1},
---	default.node_sound_metal_defaults())
 	steel_sounds)

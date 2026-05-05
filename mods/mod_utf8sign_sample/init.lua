@@ -4,13 +4,16 @@ local S = minetest.get_translator("mod_utf8sign_sample")
 -- --- 1. C++エンジンへの物差し通知 ---
 if minetest.utf8sign then
 	minetest.utf8sign.set_config({
-		width = 115,
-		line_height = 14,
-		max_lines = 4,
-		char_w = 5,
-		padding_x = 4
+--		width = 115,
+		st_line_height = 14,
+		st_max_lines = 4,
+		st_char_w_han = 6,
+		st_char_w_zen = 12,
 	})
 end
+
+--定数
+local ST_SIGN_WIDTH = 115 -- 看板文字用テクスチャのサイズ（幅）
 
 -- sound setting
 local sounds = {}
@@ -38,10 +41,10 @@ end
 
 -- 文字更新用の関数
 local function update_sign_visual(pos, text)
-	local tex = {"utf8_blank.png"}
+	local tex = "utf8_blank.png"
 	if text ~= "" then
 		-- 115x82キャンバス、左余白15、上余白14、黒色
-		tex = "[utf8combine:115x82:15,14@000000=" .. text .. "]"
+		tex = "[utf8combine:" .. ST_SIGN_WIDTH .. "x82:15,14@000000=" .. text .. "]"
 		print("DEBUG_LUA_TEX: " .. tex) -- これをターミナルに表示させる
 	end
 
@@ -57,10 +60,8 @@ end
 -- --- 3. 文字表示プレート(Entity)の定義 ---
 minetest.register_entity("mod_utf8sign_sample:text_entity", {
 	visual = "upright_sprite",
---	visual_size = {x = 0.85, y = 0.85}, 
 	visual_size = {x = 0.875, y = 0.625}, 
 	textures = {"utf8_blank.png"}, -- デフォルトは透明
---	textures = {"utf8_test_115.png"}, -- デフォルトは透明
 	physical = false,
 	pointable = false,
 	is_visible = true,
@@ -172,13 +173,11 @@ elseif minetest.get_modpath("mcl_sounds") then
 end
 
 -- 木の看板
-register_utf8_sign("wood", S("UTF-8 Wooden Sign"), 
+register_utf8_sign("wood", S("Wooden Sign (UTF-8 Atlas)"), 
 	{choppy = 2, attached_node = 1, flammable = 2, oddly_breakable_by_hand = 3},
---	default.node_sound_wood_defaults())
 	wood_sounds)
 
 -- 鉄の看板
-register_utf8_sign("steel", S("UTF-8 Steel Sign"), 
+register_utf8_sign("steel", S("Steel Sign (UTF-8 Atlas)"), 
 	{cracky = 2, attached_node = 1},
---	default.node_sound_metal_defaults())
 	steel_sounds)

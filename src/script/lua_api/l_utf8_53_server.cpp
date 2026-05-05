@@ -166,48 +166,95 @@ int LuaUTF8::l_utf8_offset(lua_State *L) {
 	return 1; 
 }
 
-/**
- * utf8.eaw_width(s)
- * East Asian Widthに基づく表示幅を返します。
- */
-int LuaUTF8::l_utf8_eaw_width(lua_State *L)
-{
-	size_t len;
-	const char *s_ptr = luaL_checklstring(L, 1, &len);
-	std::string s(s_ptr, len);
+ // utf8.eaw_width(s [, han_w, zen_w])  // East Asian Widthに基づく表示幅を返します。
+int LuaUTF8::l_utf8_eaw_width(lua_State *L) {
+	std::string s = luaL_checkstring(L, 1);
+	// 引数があれば採用、なければデフォルト（6, 12）
+	int han_w = (lua_isnumber(L, 2)) ? lua_tonumber(L, 2) : 6;
+	int zen_w = (lua_isnumber(L, 3)) ? lua_tonumber(L, 3) : 12;
 
-	// 内部ロジック utf8_53 側は名前を変えずに呼び出す
-	int total_width = utf8_53::get_string_width(s);
-	lua_pushinteger(L, total_width);
+	// 先ほど改造した utf8_53::get_total_pixel_width へリレー！
+//	lua_pushinteger(L, utf8_53::get_total_pixel_width(s, han_w, zen_w));
+	lua_pushinteger(L, utf8_53::get_text_width(s, han_w, zen_w));
 	return 1;
 }
 
-/**
- * utf8.eaw_truncate(s, max_width)
- * 指定した表示幅で文字列を切り詰めます。
- */
-int LuaUTF8::l_utf8_eaw_truncate(lua_State *L)
-{
+// utf8.eaw_truncate(s, max_px [, han_w, zen_w])  // 指定した表示幅で文字列を切り詰めます。
+int LuaUTF8::l_utf8_eaw_truncate(lua_State *L) {
 	size_t len;
 	const char *s_ptr = luaL_checklstring(L, 1, &len);
 	std::string s(s_ptr, len);
 	int max_width = (int)luaL_checkinteger(L, 2);
 
-	std::string res = "";
-	int current_width = 0;
-	size_t pos = 0;
-	int cp;
+	// --- 職人のバケツリレー開始 ---
+	// 第3・第4引数があれば読み取り、なければデフォルト値（6, 12）
+	int han_w = (lua_isnumber(L, 3)) ? (int)lua_tonumber(L, 3) : 6;
+	int zen_w = (lua_isnumber(L, 4)) ? (int)lua_tonumber(L, 4) : 12;
 
-	while (utf8_53::get_next_char(s, pos, cp)) {
-		int w = utf8_53::get_char_width(cp);
-		if (current_width + w > max_width)
-			break;
-		
-		utf8_53::push_char(res, cp);
-		current_width += w;
-	}
+	// 実装本体（utf8_53.cpp）にすべてを任せる！
+//	std::string res = utf8_53::truncate_to_pixel_width(s, max_width, han_w, zen_w);
+	std::string res = utf8_53::truncate_text(s, max_width, han_w, zen_w);
 
 	lua_pushlstring(L, res.c_str(), res.length());
+	return 1;
+}
+
+// UTF-8 Wrapper API
+
+// utf8wrap.char_width(cp) -> 文字の論理幅(1 or 2)を返す
+int LuaUTF8::l_utf8_eaw_char_width(lua_State *L) {
+	int cp = (int)luaL_checkinteger(L, 1);
+	lua_pushinteger(L, utf8_53::get_char_width(cp));
+	return 1;
+}
+
+// w21: utf8wrap.width(s, han, zen)
+int LuaUTF8::l_utf8wrap_width(lua_State *L) {
+	std::string s = luaL_checkstring(L, 1);
+	int han = (lua_isnumber(L, 2)) ? (int)lua_tonumber(L, 2) : 6;
+	int zen = (lua_isnumber(L, 3)) ? (int)lua_tonumber(L, 3) : 12;
+	lua_pushinteger(L, utf8_53::get_text_width(s, han, zen));
+	return 1;
+}
+
+// w22: utf8wrap.truncate(s, max_px, han, zen)
+int LuaUTF8::l_utf8wrap_truncate(lua_State *L) {
+	std::string s = luaL_checkstring(L, 1);
+	int max_px = (int)luaL_checkinteger(L, 2);
+	int han = (lua_isnumber(L, 3)) ? (int)lua_tonumber(L, 3) : 6;
+	int zen = (lua_isnumber(L, 4)) ? (int)lua_tonumber(L, 4) : 12;
+	std::string res = utf8_53::truncate_text(s, max_px, han, zen);
+	lua_pushlstring(L, res.c_str(), res.length());
+	return 1;
+}
+
+// w23: utf8wrap.wrap(s, max_px, han, zen)
+int LuaUTF8::l_utf8wrap_wrap(lua_State *L) {
+	std::string s = luaL_checkstring(L, 1);
+	int max_px = (int)luaL_checkinteger(L, 2);
+	int han = (lua_isnumber(L, 3)) ? (int)lua_tonumber(L, 3) : 6;
+	int zen = (lua_isnumber(L, 4)) ? (int)lua_tonumber(L, 4) : 12;
+	std::vector<std::string> lines = utf8_53::wrap_text(s, max_px, han, zen);
+	lua_newtable(L);
+	for (size_t i = 0; i < lines.size(); ++i) {
+		lua_pushstring(L, lines[i].c_str());
+		lua_rawseti(L, -2, i + 1);
+	}
+	return 1;
+}
+
+// w24: utf8wrap.lines(s, max_px, han, zen)
+int LuaUTF8::l_utf8wrap_lines(lua_State *L) {
+	std::string s = luaL_checkstring(L, 1);
+	int max_px = (int)luaL_checkinteger(L, 2);
+	int han = (lua_isnumber(L, 3)) ? (int)lua_tonumber(L, 3) : 6;
+	int zen = (lua_isnumber(L, 4)) ? (int)lua_tonumber(L, 4) : 12;
+	std::vector<std::string> lines = utf8_53::generate_lines(s, max_px, han, zen);
+	lua_newtable(L);
+	for (size_t i = 0; i < lines.size(); ++i) {
+		lua_pushstring(L, lines[i].c_str());
+		lua_rawseti(L, -2, i + 1);
+	}
 	return 1;
 }
 
@@ -225,14 +272,26 @@ void LuaUTF8::Initialize(lua_State *L, int top)
 		{"offset",	LuaUTF8::l_utf8_offset},
 		// Lua側から見える名前を eaw_... に設定
 		{"eaw_width",	LuaUTF8::l_utf8_eaw_width},
-		{"eaw_truncate", LuaUTF8::l_utf8_eaw_truncate},		{NULL, NULL}
+		{"eaw_truncate", LuaUTF8::l_utf8_eaw_truncate},
+		{NULL, NULL}
 	};
 
 	lua_newtable(L);
 	luaL_setfuncs(L, utf8_funcs, 0);
 	lua_pushstring(L, "[\0-\x7F\xC2-\xF4][\x80-\xBF]*");
 	lua_setfield(L, -2, "charpattern");
-
 	// グローバルに "utf8" として公開
 	lua_setglobal(L, "utf8");
+
+	// ---  utf8wrap テーブルの登録 ---
+	static const luaL_Reg wrap_funcs[] = {
+		{"width",    LuaUTF8::l_utf8wrap_width},
+		{"truncate", LuaUTF8::l_utf8wrap_truncate},
+		{"wrap",     LuaUTF8::l_utf8wrap_wrap},
+		{"lines",    LuaUTF8::l_utf8wrap_lines},
+		{NULL, NULL}
+	};
+	lua_newtable(L);
+	luaL_setfuncs(L, wrap_funcs, 0);
+	lua_setglobal(L, "utf8wrap"); // グローバルに公開！
 }
