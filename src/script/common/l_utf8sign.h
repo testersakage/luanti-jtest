@@ -8,8 +8,8 @@
 #include <vector>
 
 // 0=無効 , 1=有効
-#define UTF8_ATLAS 1
-#define UTF8_SDL2_ATLAS 0
+#define UTF8_ATLAS 0
+#define UTF8_SDL2_ATLAS 1
 #define UTF8_SDL2_FREETYPE 0
 
 
@@ -41,18 +41,13 @@ struct UTF8STDAtlas {
 //	bool alpha_reverse = true;
 //	u32 grid_size = 14;
 	// Cache Setting
-	u32 page_cache = 4; 
+	u32 page_cache = 4;
+	std::string st_atlas_path = ""; // atlasの場所
 };
 #endif
 
 // - - - - - - - - - - - - - - - -
 #if UTF8_SDL2_ATLAS
-// --- スキャンで見つかった「有効な仕入れ先」の情報 ---
-struct ResolvedAtlas {
-	AtlasDefinition def;
-	std::string full_path;     // PathExistsで確認済みの絶対パス
-};
-
 // --- Atlas 定義情報の保管場所 ---
 struct AtlasDefinition {
 	std::string mod_name;      // ID
@@ -64,6 +59,12 @@ struct AtlasDefinition {
 	u32 glyph_h = 14;          // 抜き出す高さ
 	bool alpha_reverse = true; // 反転フラグ
 };
+// --- スキャンで見つかった「有効な仕入れ先」の情報 ---
+struct ResolvedAtlas {
+	AtlasDefinition def;
+	std::string full_path;     // PathExistsで確認済みの絶対パス
+};
+
 
 // --- Atlas Render 情報格納場所 ---
 struct UTF8AtlasConfig {
@@ -78,6 +79,8 @@ struct UTF8AtlasConfig {
 	std::string current_atlas_id = "none";
 	bool alpha_reverse = true;
 	u32 grid_size = 14;
+	u32 ex_char_cache = 256;
+	u32 ex_page_cache = 4;
 };
 #endif
 
@@ -138,15 +141,23 @@ public:
 	UTF8AtlasConfig atlas;
 
 	// 見つかったAtlasを登録する窓口
+//	void registerAtlas(const AtlasDefinition &def, const std::string &path);
 	void registerAtlas(const AtlasDefinition &def, const std::string &path);
 
-	// Atlas 読み出し
-	void loadGrimoire(const std::string &path = "");
+	// 使用するAtlasプロファイルの選択
+	void selectAtlas(const std::string &id);
+
+	// Atlasプロファイルをjsonから読み込み
+//	void loadGrimoire(const std::string &path = "");
+	void loadGrimoire(const std::string &override_path);
+
+	// Atlasプロファイルの内容を参照する
+	const ResolvedAtlas& getSelectedAtlas() const;
 
 	// 外の世界から「名簿」を安全に覗き見るための窓口
-	const std::vector<ResolvedAtlas>& getAvailableAtlases() const {
-		return m_available_atlases;
-	}
+//	const std::vector<ResolvedAtlas>& getAvailableAtlases() const {
+//		return m_available_atlases;
+//	}
 #endif
 
 #if UTF8_SDL2_FREETYPE
@@ -178,8 +189,10 @@ namespace l_utf8sign {
 
 #if UTF8_SDL2_ATLAS
 	// --- Extended Atlas専用 (minetest.utf8sign.ex.*) ---
-	int l_ex_get_cache_size(lua_State *L);
-	int l_ex_get_cache_count(lua_State *L);
+	int l_ex_load_atlas_config(lua_State *L);
+	int l_ex_get_atlas_status(lua_State *L);
+	int l_ex_get_char_cache(lua_State *L);
+	int l_ex_get_page_cache(lua_State *L);
 #endif
 
 #if UTF8_SDL2_FREETYPE

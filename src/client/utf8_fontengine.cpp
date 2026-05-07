@@ -1,8 +1,4 @@
 // src/client/utf8_fontengine.cpp
-// Luanti
-// SPDX-License-Identifier: LGPL-2.1-or-later
-// Copyright (C) 2010-2014 sapier <sapier at gmx dot net>
-#define FT_DEBUG_VIEW 0 // 1 にすると診断モード起動！
 
 // 1. Irrlichtの型を使うための「親玉」を一番上に持ってくる
 #include "irrlichttypes.h" 
@@ -37,9 +33,10 @@
 #include "sdl2_font.h" // これを忘れずに
 
 // 0=無効 , 1=有効
-#define UTF8_ATLAS 1
-#define UTF8_SDL2_ATLAS 0
+#define UTF8_ATLAS 0
+#define UTF8_SDL2_ATLAS 1
 #define UTF8_SDL2_FREETYPE 0
+
 
 UTF8FontEngine::UTF8FontEngine()
 {
@@ -59,16 +56,6 @@ UTF8FontEngine::~UTF8FontEngine()
 #endif
 
 }
-
-/**
- * 補足:
- * RenderingEngine や IGUIFont などの複雑な部分は 
- * g_fontengine->getFont() が内部で処理してくれるため、
- * 私たちが直接触る必要はありません。
- */
-// 1. インクルードの後にこれを追加（irr:: を省略できるようにする）
-//using namespace irr;
-
 
 // UTF8FontEngine.cpp 内の parseUtf8Spec
 RenderTask UTF8FontEngine::parseUtf8Spec(const std::string &spec)
@@ -140,31 +127,36 @@ RenderTask UTF8FontEngine::parseUtf8Spec(const std::string &spec)
 		}
 	}
 */
-	// --- 5. テキスト内容の解析 (ここが今回の肝) ---
-	if (utf8_tag_pos != std::string::npos) {
-		// 【新形式】 UTF8:123,456...
-		std::string list = spec.substr(utf8_tag_pos + 5);
-		if (!list.empty() && list.back() == ']') list.pop_back();
+	// --- 5. テキスト内容の解析 (エンジンごとに「合図」を決める) ---
+	if (task.engine_type == UTF8EngineType::EX || task.engine_type == UTF8EngineType::FT) {
+		// --- 【EX/FT専用】 ":UTF8:" を探す ---
+		size_t pos = spec.find(":UTF8:");
+		if (pos != std::string::npos) {
+			std::string list = spec.substr(pos + 6);
+			if (!list.empty() && list.back() == ']') list.pop_back();
 
-		std::stringstream ss(list);
-		std::string item;
-		while (std::getline(ss, item, ',')) {
-			if (item.empty()) continue;
-			try {
-				u32 code = std::stoul(item);
-				task.codes.push_back(code);
-				// STD版のために文字列も復元
-//				utf8_53::push_char(task.raw_text, (int)code);
-			} catch (...) {}
+			std::stringstream ss(list);
+			std::string item;
+			while (std::getline(ss, item, ',')) {
+				if (item.empty()) continue;
+				try {
+					u32 code = std::stoul(item);
+					task.codes.push_back(code);
+					// 物差し（改行計算）のために文字列を復元
+					utf8_53::push_char(task.raw_text, (int)code);
+				} catch (...) {}
+			}
 		}
-	} else if (equal_pos != std::string::npos) {
-		// 【旧形式】 =テキスト
-		std::string raw = spec.substr(equal_pos + 1);
-		if (!raw.empty() && raw.back() == ']') raw.pop_back();
-		
-		task.raw_text = raw;
-		// FT/EX版のためにコードポイント配列も生成 (utf8_53の知恵を借りる)
-//		task.codes = utf8_53::to_codepoints(raw);
+	} else {
+		// --- 【旧Atlas専用】 "=" を探す ---
+		size_t pos = spec.find("=");
+		if (pos != std::string::npos) {
+			std::string raw = spec.substr(pos + 1);
+			if (!raw.empty() && raw.back() == ']') raw.pop_back();
+			
+			task.raw_text = raw;
+			task.codes = utf8_53::to_codepoints(raw);
+		}
 	}
 
 	return task;
@@ -236,95 +228,6 @@ void* UTF8FontEngine::getGlyphImage(wchar_t c)
 // 関数 UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 {
-/*
-	actionstream << "RenderUTF8Combine: Old Atlas Glyph Engine Called!" << std::endl;
-
-	if (!m_atlas_cache) m_atlas_cache = new UTF8FontAtlas();
-	if (!dest_img_ptr) return;
-	video::IImage *dest_img = reinterpret_cast<video::IImage*>(dest_img_ptr);
-
-	// --- 0. 共通の物差し（Manager）から最新設定を取得 ---
-	UTF8STDAtlas &cfg = UTF8SignManager::getInstance()->st_atlas;
-
-	// --- 1. 終端チェックと外枠剥離 ---
-	if (command.empty() || command.front() != '[' || command.back() != ']') {
-		actionstream << "UTF8FontEngine: Syntax Error (Missing []): " << command << std::endl;
-		return;
-	}
-
-	std::string inner = command.substr(1, command.length() - 2);
-
-	// --- 2. 大ブロックの分離 (コロンによる分割) ---
-	size_t first_colon = inner.find(':');
-	size_t second_colon = inner.find(':', first_colon + 1);
-
-	if (first_colon == std::string::npos || second_colon == std::string::npos) {
-		actionstream << "UTF8FontEngine: Syntax Error (Missing colons): " << command << std::endl;
-		return;
-	}
-
-	std::string size_part = inner.substr(first_colon + 1, second_colon - first_colon - 1);
-	std::string content_part = inner.substr(second_colon + 1);
-
-	// --- 3. 詳細パース：キャンバスサイズ ---
-	// デフォルト値を cfg.st_sign_width に変更
-	u32 canvas_w = cfg.st_sign_width, canvas_h = 115; 
-	size_t x_pos = size_part.find('x');
-	if (x_pos != std::string::npos) {
-		canvas_w = mystoi(size_part.substr(0, x_pos));
-		canvas_h = mystoi(size_part.substr(x_pos + 1));
-	}
-
-	dest_img->fill(video::SColor(0, 0, 0, 0));
-
-	// --- 4. 詳細パース：座標・色・テキスト ---
-	size_t equal = content_part.find('=');
-	if (equal == std::string::npos) {
-		actionstream << "UTF8FontEngine: Syntax Error (Missing '='): " << command << std::endl;
-		return;
-	}
-
-	std::string settings = content_part.substr(0, equal);
-	std::string raw_text = content_part.substr(equal + 1);
-
-	// ★ 座標の初期値を設定値 (padding_x) に同期
-	u32 start_x = cfg.st_padding_x; 
-	u32 start_y = 2; // ここも将来的に cfg.padding_y を追加可能
-	video::SColor target_color(255, 255, 255, 255);
-
-	// カラーコード解析
-	size_t at_sign = settings.find('@');
-	if (at_sign != std::string::npos) {
-		std::string hex_str = settings.substr(at_sign + 1);
-		try {
-			unsigned long color_val = std::stoul(hex_str, nullptr, 16);
-			target_color = video::SColor(255, (color_val >> 16) & 0xFF, (color_val >> 8) & 0xFF, color_val & 0xFF);
-		} catch (...) {}
-	}
-
-	// 座標解析（コマンド指定があれば上書き）
-	size_t comma = settings.find(',');
-	if (comma != std::string::npos) {
-		start_x = mystoi(settings.substr(0, comma));
-		size_t y_end = (at_sign != std::string::npos) ? at_sign : settings.length();
-		start_y = mystoi(settings.substr(comma + 1, y_end - (comma + 1)));
-	}
-
-	if (raw_text.empty()) return;
-
-	// 改行幅の計算（余白を考慮）
-	int wrap_width = canvas_w - (start_x * 2); 
-	if (wrap_width <= 0) wrap_width = canvas_w;
-// 関数移設に伴う変更
-// std::vector<std::string> lines = utf8_53::get_lines(raw_text, wrap_width);
-	std::vector<std::string> lines = utf8_53::generate_lines(
-	raw_text, 
-	wrap_width, 
-	cfg.st_char_w_han, 
-	cfg.st_char_w_zen
-	);
-*/
-
 	actionstream << "RenderUTF8Combine: Old Atlas Glyph Engine Called!" << std::endl;
 
 	// ---  準備：キャンバスと蔵の確認 ---
@@ -401,6 +304,7 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 
 #if UTF8_SDL2_ATLAS
 
+/*
 // Atlasからピクセルを抜き出して蔵(Glyph)の形にする
 bool UTF8FontEngine::extractAtlasGlyph(u32 code, FTCachedGlyph &out_glyph)
 {
@@ -472,95 +376,90 @@ bool UTF8FontEngine::extractAtlasGlyph(u32 code, FTCachedGlyph &out_glyph)
 	img->drop(); 
 	return true;
 }
+*/
+
 // Atlas EX Cahe制御用 静的変数
-std::map<u64, EXCachedChar> UTF8FontEngine::m_char_cache;
-std::map<u64, EXCachedPage> UTF8FontEngine::m_page_cache;
+//std::map<u64, EXCachedChar> UTF8FontEngine::m_char_cache;
+//std::map<u64, EXCachedPage> UTF8FontEngine::m_page_cache;
 
 void UTF8FontEngine::renderutf8combineex(void *dest_img_ptr, const std::string &command)
 {
-	actionstream << "RenderUTF8Combine: SDL2 Atlas Glyph Engine Called!" << std::endl;
+	actionstream << "RenderUTF8Combine: SDL2 Atlas Engine Called!" << std::endl;
+
 	if (!dest_img_ptr) return;
 	video::IImage *dest_img = reinterpret_cast<video::IImage*>(dest_img_ptr);
+	dest_img->fill(video::SColor(0, 0, 0, 0));
 
-	// 1. 共通のパース関数で「注文票」を受け取る
+	// 1. 注文票をパース（DDE対応窓口）
 	RenderTask task = parseUtf8Spec(command);
-	if (task.codes.empty()) return;
+	if (task.raw_text.empty() && task.codes.empty()) return;
 
-	auto manager = UTF8SignManager::getInstance();
-	// 知識がなければロード
-	if (manager->getAvailableAtlases().empty()) {
-		manager->loadGrimoire();
-	}
+	// 2. 司令塔（Manager）から指示書を取得
+	auto &cfg = UTF8SignManager::getInstance()->atlas;
 
-	bool use_cache = (manager->ft.cache_size > 0);
-	auto &ex_cfg = manager->atlas;
+	// 3. 改行位置の計算（utf8_53の知恵を拝借）
+	u32 start_x = (task.start_x == 0) ? cfg.ex_padding_x : task.start_x;
+	u32 start_y = (task.start_y == 0) ? cfg.ex_padding_y : task.start_y;
+	u32 wrap_w  = dest_img->getDimension().Width - (start_x * 2);
 
-	//  描画開始位置の決定
-	u32 cursor_x = (task.start_x == 0) ? ex_cfg.ex_padding_x : task.start_x;
-	u32 cursor_y = (task.start_y == 0) ? ex_cfg.ex_padding_y : task.start_y;
-	u32 line_h   = ex_cfg.ex_line_height; 
+	std::vector<std::string> lines = utf8_53::generate_lines(
+		task.raw_text, wrap_w, cfg.ex_char_w_han, cfg.ex_char_w_zen);
 
-	u32 max_w = dest_img->getDimension().Width;
-	u32 margin_right = ex_cfg.ex_padding_x;
-	
-	FTCachedGlyph temp_glyph; // 直接抽出用の受け皿
+	// 4. 描画ループ：各行を Atlas からスタンプ
+	u32 cursor_y = start_y;
+	for (const std::string &line_str : lines) {
+		std::vector<int> codes = utf8_53::to_codepoints(line_str);
+		u32 cursor_x = start_x;
 
-	//  Atlas抽出 ＆ 転写ループ
-	for (u32 code : task.codes) {
-		if (code == 10) { // 改行
-			cursor_x = (task.start_x == 0) ? ex_cfg.ex_padding_x : task.start_x;
-			cursor_y += line_h;
-			continue;
-		}
-		FTCachedGlyph* glyph = nullptr;
+		for (u32 code : codes) {
+			//  二段構えキャッシュ完結型の画像取得
+			ImageRGBA glyph = UTF8FontAtlas::getGlyphImageEX(code);
 
-		if (use_cache) {
-			// --- 蔵（キャッシュ）から引き出すルート ---
-			glyph = getOrCacheGlyph(code, nullptr, 0);
-		} else {
-			// --- 現場（直接抽出）から運ぶルート ---
-			if (extractAtlasGlyph(code, temp_glyph)) glyph = &temp_glyph;
-		}
+//	actionstream << "RenderUTF8CombineEX: chechk glyph" << std::endl;
 /*
-		// 蔵（キャッシュ）から12x14のドットを召喚
-		// ※内部で extractAtlasGlyph が呼ばれ、JSONの設定通りに動く [INDEX: 5]
-		FTCachedGlyph* glyph = getOrCacheGlyph(code, nullptr, 0); 
-*/
-		if (glyph) {
-/*
-			// 蔵から出した文字が「空っぽ」じゃないかログで白状させる
-    actionstream << "DEBUG_GLYPH: Code=" << code 
-                 << " Size=" << glyph->width << "x" << glyph->rows 
-                 << " BitmapSize=" << glyph->bitmap.size() << std::endl;
-*/
-			// 半角なら han(6px)、全角なら glyph->width(12px)
-			bool half = (code <= 0x00FF) || (code >= 0xFF61 && code <= 0xFF9F);
-			u32 advance = half ? ex_cfg.ex_char_w_han : ex_cfg.ex_char_w_zen;
+	if (!glyph.data.empty()) {
+	actionstream << "RenderUTF8CombineEX: exist data in glyph" << std::endl;
+        // ファイル名を "glyph_0x[16進数コード].bmp" にする
+        char bmp_name[64];
+        snprintf(bmp_name, sizeof(bmp_name), "glyph_0x%04x.bmp", code);
 
-			// もし右端を突破しそうなら、描く前に改行！
-			if (cursor_x + advance > max_w - margin_right) {
-				cursor_x = (task.start_x == 0) ? ex_cfg.ex_padding_x : task.start_x;
-				cursor_y += line_h;
-			}
+        // まだこの文字の検品が終わっていない（ファイルがない）場合だけ保存
+        if (!file_exists(bmp_name)) {
+            saveToBMP(glyph, bmp_name); // 先ほどのBMP保存関数
+        }
+    }
+*/
+			if (!glyph.data.empty()) {
+				// 半角・全角の歩幅判定
+				bool is_half = (code <= 0x00FF) || (code >= 0xFF61 && code <= 0xFF9F);
+				u32 advance = is_half ? cfg.ex_char_w_han : cfg.ex_char_w_zen;
 
-			// --- 3. 転写処理 ---
-			u32 draw_w = half ? ex_cfg.ex_char_w_han : glyph->width;
-			for (u32 y = 0; y < glyph->rows; y++) {
-				if (cursor_y + y >= dest_img->getDimension().Height) break; // 縦の限界突破防止
-				for (u32 x = 0; x < draw_w; x++) {
-					u32 idx = y * glyph->width + x;
-					u8 alpha = glyph->bitmap[idx];
-					if (alpha > 0) {
-						video::SColor color = task.color;
-						color.setAlpha(alpha); 
-						dest_img->setPixel(cursor_x + x, cursor_y + y, color);
+				// --- ピクセル転写（ダイレクトスタンプ） ---
+				for (int y = 0; y < glyph.height; y++) {
+					u32 dy = cursor_y + y;
+					if (dy >= dest_img->getDimension().Height) break;
+
+					for (int x = 0; x < (int)advance; x++) {
+						if (x >= glyph.width) break;
+						u32 dx = cursor_x + x;
+						if (dx >= dest_img->getDimension().Width) break;
+
+						// Atlas（モノクロPNG）の Alpha を拾って色を乗せる
+						int src_idx = (y * glyph.width + x) * 4;
+						u8 alpha = glyph.data[src_idx + 3];
+
+						if (alpha > 0) {
+							video::SColor color = task.color;
+							color.setAlpha(alpha);
+							dest_img->setPixel(dx, dy, color);
+//							dest_img->setPixel(dx, dy, video::SColor(255, 255, 0, 0));
+						}
 					}
 				}
+				cursor_x += advance;
 			}
-
-			// 4. カーソルを進める
-			cursor_x += advance;
 		}
+		cursor_y += cfg.ex_line_height;
 	}
 }
 #endif

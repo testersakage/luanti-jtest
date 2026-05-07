@@ -9,8 +9,8 @@
 #include <list>
 
 // 0=無効 , 1=有効
-#define UTF8_ATLAS 1
-#define UTF8_SDL2_ATLAS 0
+#define UTF8_ATLAS 0
+#define UTF8_SDL2_ATLAS 1
 #define UTF8_SDL2_FREETYPE 0
 
 // combine命令パース用構造体
@@ -28,7 +28,7 @@ struct RenderTask {
 	u32 start_x = 0;
 	u32 start_y = 0;
 	video::SColor color = video::SColor(255, 0, 0, 0); // デフォルト黒
-	std::vector<u32> codes;	// EX/FT用 コードポイント列
+	std::vector<int> codes;	// EX/FT用 コードポイント列
 	std::string raw_text;	// ST用 通常の文字列
 };
 
@@ -62,7 +62,6 @@ public:
 	static void renderUtf8Combine(void *dest_img_ptr, const std::string &command);
 #endif
 
-	
 #if UTF8_SDL2_ATLAS
 	// imagesource.cpp [utf8combineex 命令で実行されるレンダリング関数
 	static void renderutf8combineex(void *dest_img_ptr, const std::string &command);
@@ -88,7 +87,10 @@ private:
 
 #if UTF8_SDL2_ATLAS
 	//  Atlas Cache
-	static bool extractAtlasGlyph(u32 code, FTCachedGlyph &out_glyph);
+//	static bool extractAtlasGlyph(u32 code, FTCachedGlyph &out_glyph);
+
+//	static std::map<u64, EXCachedChar> UTF8FontEngine::m_char_cache;
+//	static std::map<u64, EXCachedPage> UTF8FontEngine::m_page_cache;
 #endif
 
 #if UTF8_SDL2_FREETYPE

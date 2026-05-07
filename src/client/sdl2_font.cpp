@@ -16,8 +16,8 @@
 
 
 // 0=無効 , 1=有効
-#define UTF8_ATLAS 1
-#define UTF8_SDL2_ATLAS 0
+#define UTF8_ATLAS 0
+#define UTF8_SDL2_ATLAS 1
 #define UTF8_SDL2_FREETYPE 0
 
 
@@ -99,6 +99,7 @@ bool init(const std::string &font_path, unsigned int font_size, int requested_in
 	// --- 職人の詳細自白ログ ---
 	FT_Int major, minor, patch;
 	FT_Library_Version(ft_library, &major, &minor, &patch);
+/*
 #if FT_DEBUG
 	actionstream << "SDL2Font: === FT BACKEND READY ===" << std::endl;
 	actionstream << "SDL2Font: FreeType Version: " << major << "." << minor << "." << patch << std::endl;
@@ -108,11 +109,13 @@ bool init(const std::string &font_path, unsigned int font_size, int requested_in
 	actionstream << "SDL2Font: Pixel Size:  " << font_size << std::endl;
 	actionstream << "SDL2Font: ==========================" << std::endl;
 #endif
+*/
 	// ★ 成功した瞬間に、今回の設定を「備忘録」に書き込む！
 //	loaded_path  = font_path;
 	loaded_size  = font_size;
 	loaded_index = final_index; // 実際に確定したインデックス
 
+/*
 #if UTF8_SDL2_ATLAS
 // asuna check
 	// --- 全ゲームをスキャンして Asuna の蔵を探す ---
@@ -124,7 +127,7 @@ bool init(const std::string &font_path, unsigned int font_size, int requested_in
 	asuna_def.mod_name     = "asuna";
 	asuna_def.sub_path     = std::string("mods") + DIR_DELIM + "signs_lib" + DIR_DELIM + "textures" + DIR_DELIM + "unifont";
 	asuna_def.file_pattern = "signs_lib_uni%02x.png";
-	asuna_def.glyph_size   = 16;
+	asuna_def.grid_size   = 16;
 
 	actionstream << "SDL2Font: Scanning installed games for Atlas resources..." << std::endl;
 
@@ -155,9 +158,10 @@ bool init(const std::string &font_path, unsigned int font_size, int requested_in
 	// 外部Atlas が利用可能かの確認
 	UTF8SignManager::getInstance()->loadGrimoire();
 #endif
+*/
 	return true;
 }
-
+/*
 bool render_to_buffer(uint32_t code, unsigned char* dest, int dest_w, int dest_h, bool antialias, unsigned int font_size, unsigned int baseline) 
 {
 	if (!ft_face) return false;
@@ -211,7 +215,7 @@ bool render_to_buffer(uint32_t code, unsigned char* dest, int dest_w, int dest_h
 	}
 	return true;
 }
-
+*/
 void cleanup()
 {
 	if (ft_face) {

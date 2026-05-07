@@ -34,7 +34,7 @@ namespace sdl2_font { // sdl2 に統一！
 	 * @param dest_h バッファの高さ
 	 * @return 成功ならtrue
 	 */
-	bool render_to_buffer(uint32_t code, unsigned char* dest, int dest_w, int dest_h, bool antialias, unsigned int font_size, unsigned int baseline);
+//	bool render_to_buffer(uint32_t code, unsigned char* dest, int dest_w, int dest_h, bool antialias, unsigned int font_size, unsigned int baseline);
 	//bool render_to_buffer(uint32_t code, unsigned char* dest, int dest_w, int dest_h, bool antialias, unsigned int font_size, unsigned int baseline);
 
 	/**

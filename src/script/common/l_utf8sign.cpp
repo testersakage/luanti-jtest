@@ -12,6 +12,7 @@
 #include "util/string.h"  // DIR_DELIM 用（あるいは get_separator() 等）
 #include "settings.h"     // g_settings 用
 #include "json/json.h"
+#include "SDL2/SDL_image.h"
 #include <fstream>
 #include <sstream>
 
@@ -25,8 +26,8 @@ extern "C" {
 #include "log.h"
 
 // 0=無効 , 1=有効
-#define UTF8_ATLAS 1
-#define UTF8_SDL2_ATLAS 0
+#define UTF8_ATLAS 0
+#define UTF8_SDL2_ATLAS 1
 #define UTF8_SDL2_FREETYPE 0
 
 UTF8SignManager* UTF8SignManager::m_instance = nullptr;
@@ -37,7 +38,7 @@ UTF8SignManager* UTF8SignManager::getInstance() {
 }
 
 #if UTF8_SDL2_ATLAS
-
+// 登録 UTF8SignManager::registerAtlas(const AtlasDefinition &def, const std::string &path)
 void UTF8SignManager::registerAtlas(const AtlasDefinition &def, const std::string &path)
 {
 	// 重複登録のチェック：すでに同じパスが名簿にあれば、何もしない
@@ -53,7 +54,110 @@ void UTF8SignManager::registerAtlas(const AtlasDefinition &def, const std::strin
 	             << "] at " << path << std::endl;
 }
 
+// 選択 UTF8SignManager::selectAtlas(const std::string &id)
+void UTF8SignManager::selectAtlas(const std::string &id)
+{
+	for (const auto &res : m_available_atlases) {
+		if (res.def.mod_name == id) {
+			// 「設計図」から「現場用設定(Config)」へ同期
+			this->atlas.current_atlas_id = res.def.mod_name;
+			this->atlas.ex_char_w_zen    = res.def.glyph_w;
+			this->atlas.ex_char_w_han    = res.def.glyph_w / 2; // 自動で半分に
+			this->atlas.ex_line_height   = res.def.glyph_h;
+			this->atlas.grid_size        = res.def.grid_size;
+			this->atlas.alpha_reverse    = res.def.alpha_reverse;
+			
+			actionstream << "UTF8SignManager: Active Atlas switched to [" << id << "]" << std::endl;
+			return;
+		}
+	}
+	errorstream << "UTF8SignManager: Atlas ID [" << id << "] not found in Grimoire!" << std::endl;
+}
 
+// 読み込み UTF8SignManager::loadGrimoire(const std::string &override_path)
+void UTF8SignManager::loadGrimoire(const std::string &override_path)
+{
+	// ... (中略：Jsonパース部分まで) ...
+	// 二度読み防止
+	static bool grimoire_loaded = false;
+	if (grimoire_loaded) return;
+
+	std::string grimoire_path = override_path;
+
+	// 引数がない場合は、これまでの minetest.conf 経由のパスを作る
+	if (grimoire_path.empty()) {
+		std::string grimoire_name = g_settings->get("utf8_atlas_config");
+		if (grimoire_name.empty()) return;
+		grimoire_path = std::string(porting::path_share) + DIR_DELIM + "fonts" + DIR_DELIM + grimoire_name;
+	}
+
+	if (fs::PathExists(grimoire_path)) {
+		actionstream << "UTF8SignManager: Found Atlas config." << std::endl;
+	} else {
+		// あくまで警告に留め、動作は止めない
+		infostream << "UTF8SignManager: Not found Atlas config." << std::endl;
+		return;
+	}
+
+	std::ifstream ifs(grimoire_path);
+	Json::Value root;
+	Json::Reader reader;
+
+	if (reader.parse(ifs, root)) {
+//		actionstream << "UTF8SignManager: [Atlas Config Parsing] " << grimoire_path << std::endl;
+
+		const Json::Value atlases = root["target_atlases"];
+		for (u32 i = 0; i < atlases.size(); ++i) {
+			// ... (AtlasDefinition def の構築) ...
+			const Json::Value &entry = atlases[i];
+			
+			AtlasDefinition def;
+			def.mod_name      = entry.get("id", "unknown").asString();
+			def.sub_path      = entry.get("path", "").asString();
+			def.file_pattern  = entry.get("file_pattern", "uni%02x.png").asString();
+			def.grid_columns  = entry.get("grid_columns", 32).asUInt();
+			def.grid_size     = entry.get("grid_size", 14).asUInt();
+			def.glyph_w       = entry.get("glyph_w", 12).asUInt();
+			def.glyph_h       = entry.get("glyph_h", 14).asUInt();
+			def.alpha_reverse = entry.get("alpha_reverse", true).asBool();
+
+			std::string full_path = std::string(porting::path_user) + DIR_DELIM + def.sub_path;
+
+			// チェック用のファイル名を file_pattern から生成 (0番目のページ)
+			char check_file[256];
+			snprintf(check_file, sizeof(check_file), def.file_pattern.c_str(), 0);
+
+			if (fs::PathExists(full_path + DIR_DELIM + check_file)) {
+				this->registerAtlas(def, full_path);
+
+				// ★ 最初に見つかったAtlasを「デフォルト」として自動指名
+				if (this->atlas.current_atlas_id == "none" || this->atlas.current_atlas_id.empty()) {
+					this->selectAtlas(def.mod_name);
+				}
+			}
+		}
+		grimoire_loaded = true;
+	}
+}
+
+// 選択情報の取得 UTF8SignManager::getSelectedAtlas()
+const ResolvedAtlas& UTF8SignManager::getSelectedAtlas() const {
+	// 1. atlas構造体の中の ID で検索
+	for (const auto &res : m_available_atlases) { // 名前を合わせる
+		if (res.def.mod_name == atlas.current_atlas_id) {
+			return res;
+		}
+	}
+	// 2. 見つからなければ先頭を返す
+	if (!m_available_atlases.empty()) {
+		return m_available_atlases[0];
+	}
+
+	static ResolvedAtlas fallback;
+	return fallback;
+}
+
+/*
 void UTF8SignManager::loadGrimoire(const std::string &override_path)
 {
 	// 二度読み防止
@@ -129,9 +233,36 @@ void UTF8SignManager::loadGrimoire(const std::string &override_path)
 
 }
 
+const ResolvedAtlas& UTF8SignManager::getSelectedAtlas() const {
+    // 現在選択されているID（current_atlas_id）を名簿から探す
+    for (const auto &atlas : m_available_atlases) {
+        if (atlas.def.mod_name == this->atlas.current_atlas_id) {
+            return atlas;
+        }
+    }
+    // 見つからなければ、とりあえず名簿の先頭（またはデフォルト）を返す
+    if (!m_available_atlases.empty()) {
+        return m_available_atlases[0];
+    }
+    
+    // それでもダメな時のための空の定義
+    static ResolvedAtlas fallback;
+    return fallback;
+}
+*/
 #endif
 
 UTF8SignManager::UTF8SignManager() {
+
+	// --- SDL2イメージ・インフラの初期化 (一回だけ実行) ---
+#if (UTF8_SDL2_ATLAS || UTF8_SDL2_FREETYPE)
+    int flags = IMG_INIT_PNG | IMG_INIT_JPG; // PNGとJPGを有効化
+    if ((IMG_Init(flags) & flags) != flags) {
+        errorstream << "UTF8SignManager: SDL_image initialization failed! " << IMG_GetError() << std::endl;
+    } else {
+        actionstream << "UTF8SignManager: SDL_image (PNG/JPG) ready." << std::endl;
+    }
+#endif
 
 #if UTF8_ATLAS
 	st_atlas.page_cache = 4;
@@ -143,35 +274,46 @@ UTF8SignManager::UTF8SignManager() {
 			if (conf_val > 8) conf_val = 8;
 			st_atlas.page_cache = conf_val;
 		}
+
+		// ---  パス・テンプレートの設定 ---
+		if (g_settings->exists("utf8_st_atlas_path")) {
+			// 文字列として取得！
+			std::string conf_path = g_settings->get("utf8_st_atlas_path");
+
+			// そのまま構造体へ格納（これが FontAtlas の loadPage で使われる）
+			st_atlas.st_atlas_path = conf_path;
+		}
 	}
 
+	actionstream << "UTF8SignManager: Atlas Path: " 
+		<< st_atlas.st_atlas_path << std::endl;
 	actionstream << "UTF8SignManager: Font cache initialized with page: " 
 		<< st_atlas.page_cache << std::endl;
 #endif
 
 #if UTF8_SDL2_ATLAS
-	ex.char_cache = 32;
+	atlas.ex_char_cache = 64;
 
 	if (g_settings) {
 		if (g_settings->exists("utf8_ex_char_cache")) {
 			u32 conf_val = g_settings->getU32("utf8_ex_char_cache");
-			if (conf_val > 128) conf_val = 128;
-			ex.char_cache = conf_val;
+			if (conf_val > 256) conf_val = 256;
+			atlas.ex_char_cache = conf_val;
 		}
 	}
 
-	ex.page_cache = 4;
+	atlas.ex_page_cache = 4;
 
 	if (g_settings) {
 		if (g_settings->exists("utf8_ex_page_cache")) {
 			u32 conf_val = g_settings->getU32("utf8_ex_page_cache");
 			if (conf_val > 8) conf_val = 8;
-			ex.page_cache = conf_val;
+			atlas.ex_page_cache = conf_val;
 		}
 	}
 
 	actionstream << "UTF8SignManager: Font cache initialized with size: " 
-		<< ex.char_cache << " / page: " << ex.page_size << std::endl;
+		<< atlas.ex_char_cache << " / page: " << atlas.ex_page_cache << std::endl;
 #endif
 
 #if UTF8_SDL2_FREETYPE
@@ -193,35 +335,48 @@ UTF8SignManager::UTF8SignManager() {
 
 namespace l_utf8sign {
 
-#if UTF8_SDL2_FREETYPE
-
-// minetest.utf8sign.get_debug_status()
-int l_get_debug_status(lua_State *L) {
-	auto &ft_cfg = UTF8SignManager::getInstance()->ft; 
-	lua_newtable(L);
-	lua_pushstring(L, ft_cfg.last_spec.c_str());
-	lua_setfield(L, -2, "spec");
-	lua_pushinteger(L, ft_cfg.last_codes_size);
-	lua_setfield(L, -2, "codes_size");
-
-	// sdl2_font から最新の「自白データ」を奪い取って Lua のテーブルに詰める
-	lua_pushstring(L, sdl2_font::get_last_path().c_str());
-	lua_setfield(L, -2, "cpp_path"); // ★これが Lua の status.cpp_path になる
-
-	lua_pushinteger(L, sdl2_font::get_last_error());
-	lua_setfield(L, -2, "last_error"); // ★これが Lua の status.last_error になる
-	return 1;
-}
-
-#endif
-
 // minetest.utf8sign.set_config(table)
 int l_set_config(lua_State *L) {
 	luaL_checktype(L, 1, LUA_TTABLE);
 	auto &mgr = *UTF8SignManager::getInstance();
 
-#if UTF8_SDL2_ATLAS
+#if UTF8_ATLAS
+	lua_getfield(L, 1, "st_atlas");
+	if (lua_istable(L, -1)) {
+		lua_getfield(L, -1, "st_sign_width");
+		if (!lua_isnil(L, -1)) { // 型チェック関数を使う
+			warningstream << "l_utf8sign: 'st_sign_width' in set_config is DEPRECATED and ignored. "
+				<< "The width is now automatically determined by the texture spec "
+				<< "(e.g., [utf8combine:WIDTHxHEIGHT:...)." << std::endl;
+		}
+		lua_pop(L, 1);
+		mgr.st_atlas.st_char_w_han   = getintfield_default(L, -1, "st_char_w_han",   mgr.st_atlas.st_char_w_han);
+		mgr.st_atlas.st_char_w_zen   = getintfield_default(L, -1, "st_char_w_zen",   mgr.st_atlas.st_char_w_zen);
+		mgr.st_atlas.st_line_height  = getintfield_default(L, -1, "st_line_height",  mgr.st_atlas.st_line_height);
+		lua_getfield(L, -1, "st_padding_x");
+		if (!lua_isnil(L, -1)) {
+			warningstream << "l_utf8sign: 'st_padding_x' in set_config is ignored. "
+			<< "Specify combine position in texture string (e.g., :x,y@401400) instead." << std::endl;
+		}
+		lua_pop(L, 1);
+		lua_getfield(L, -1, "st_padding_y");
+		if (!lua_isnil(L, -1)) {
+			warningstream << "l_utf8sign: 'st_padding_y' in set_config is ignored. "
+			<< "Specify combine position in texture string (e.g., :x,y@401400) instead." << std::endl;
+		}
+		lua_pop(L, 1);
+		mgr.st_atlas.st_max_lines = getintfield_default(L, -1, "st_max_lines", mgr.st_atlas.st_max_lines);
+/*		lua_getfield(L, -1, "alpha_reverse");
+		if (!lua_isnil(L, -1)) {
+			warningstream << "l_utf8sign: 'alpha_reverse' cannot be set via set_config."
+			<< " Please define it in your Atlas JSON." << std::endl;
+		}	*/
+		lua_pop(L, 1);
+	}
+	lua_pop(L, 1);
+#endif
 
+#if UTF8_SDL2_ATLAS
 	// 1. atlas グループの取得
 	lua_getfield(L, 1, "atlas");
 	if (lua_istable(L, -1)) {
@@ -256,10 +411,9 @@ int l_set_config(lua_State *L) {
 		lua_pop(L, 1);
 	}
 	lua_pop(L, 1);
-
 #endif
-#if UTF8_SDL2_FREETYPE
 
+#if UTF8_SDL2_FREETYPE
 	// 2. ft グループの取得
 	lua_getfield(L, 1, "ft");
 	if (lua_istable(L, -1)) {
@@ -311,7 +465,6 @@ int l_set_config(lua_State *L) {
 		mgr.ft.blend_mode = (SignBlendMode)b_mode;
 	}
 	lua_pop(L, 1);
-
 #endif
 
 	return 0;
@@ -394,33 +547,84 @@ int l_get_config(lua_State *L) {
 }
 
 #if UTF8_ATLAS
-
-//  Cache 使用量
+//  Cache 使用量 表示
 int l_st_get_page_cache(lua_State *L) {
 	lua_pushinteger(L, UTF8FontAtlas::getPageCache());
 	return 1;
 }
+#endif
 
-#endif
 #if UTF8_SDL2_ATLAS
-#endif
-#if UTF8_SDL2_FREETYPE
+// minetest.utf8sign.ex_load_atlas_config(path)
+int l_ex_load_atlas_config(lua_State *L) {
+	const char *path = luaL_checkstring(L, 1);
+	UTF8SignManager::getInstance()->loadGrimoire(std::string(path));
+	return 0;
+}
+
+int l_ex_get_atlas_status(lua_State *L) {
+	auto &mgr = *UTF8SignManager::getInstance();
+	const ResolvedAtlas &active = mgr.getSelectedAtlas();
+
+	lua_newtable(L);
+
+	lua_pushstring(L, active.def.mod_name.c_str());
+	lua_setfield(L, -2, "active_id");
+
+	lua_pushstring(L, active.full_path.c_str());
+	lua_setfield(L, -2, "path");
+
+	lua_pushstring(L, active.def.file_pattern.c_str());
+	lua_setfield(L, -2, "file_pattern");
+
+	lua_pushinteger(L, active.def.grid_columns);
+	lua_setfield(L, -2, "grid_columns");
+
+	lua_pushinteger(L, active.def.grid_size);
+	lua_setfield(L, -2, "grid_size");
+
+	lua_pushinteger(L, active.def.glyph_w);
+	lua_setfield(L, -2, "glyph_w");
+
+	lua_pushinteger(L, active.def.glyph_h);
+	lua_setfield(L, -2, "glyph_h");
+
+	lua_pushboolean(L, active.def.alpha_reverse);
+	lua_setfield(L, -2, "alpha_reverse");
+
+	return 1;
+}
 
 //  Cache 使用量
-static int l_get_cache_count(lua_State *L) {
+int l_ex_get_char_cache(lua_State *L) {
+//	lua_pushinteger(L, UTF8FontAtlas::getCacheCountEx());
+	return 1;
+}
+
+//  Cache_sizeの現在の設定値確認
+int l_ex_get_page_cache(lua_State *L) {
+//	u32 size = UTF8SignManager::getInstance()->ex.cache_size;
+//	lua_pushinteger(L, size);
+	return 1;
+}
+#endif
+
+#if UTF8_SDL2_FREETYPE
+//  Cache 使用量
+int l_ft_get_cache_count(lua_State *L) {
 	lua_pushinteger(L, UTF8FontEngine::getCacheCount());
 	return 1;
 }
 
 //  Cache_sizeの現在の設定値確認
-static int l_get_cache_size(lua_State *L) {
+int l_ft_get_cache_size(lua_State *L) {
 	u32 size = UTF8SignManager::getInstance()->ft.cache_size;
 	lua_pushinteger(L, size);
 	return 1;
 }
 
 //  Cache_sizeの大きさ変更（上限2048）
-static int l_set_cache_size(lua_State *L) {
+int l_ft_set_cache_size(lua_State *L) {
 	u32 new_size = (u32)luaL_checkinteger(L, 1);
 	if (new_size > 2048) new_size = 2048; // ★防波堤
 
@@ -429,19 +633,27 @@ static int l_set_cache_size(lua_State *L) {
 }
 
 //  Cacheの消去
-static int l_clear_cache(lua_State *L) {
+int l_ft_clear_cache(lua_State *L) {
 	UTF8FontEngine::clearCache();
 	return 0;
 }
 
-#endif
+// minetest.utf8sign.ft_get_debug_status()
+int l_ft_get_debug_status(lua_State *L) {
+	auto &ft_cfg = UTF8SignManager::getInstance()->ft; 
+	lua_newtable(L);
+	lua_pushstring(L, ft_cfg.last_spec.c_str());
+	lua_setfield(L, -2, "spec");
+	lua_pushinteger(L, ft_cfg.last_codes_size);
+	lua_setfield(L, -2, "codes_size");
 
-#if UTF8_SDL2_ATLAS
-// minetest.utf8sign.load_atlas_config(path)
-int l_utf8sign_load_atlas_config(lua_State *L) {
-	const char *path = luaL_checkstring(L, 1);
-	UTF8SignManager::getInstance()->loadGrimoire(std::string(path));
-	return 0;
+	// sdl2_font から最新の「自白データ」を奪い取って Lua のテーブルに詰める
+	lua_pushstring(L, sdl2_font::get_last_path().c_str());
+	lua_setfield(L, -2, "cpp_path"); // これが Lua の status.cpp_path になる
+
+	lua_pushinteger(L, sdl2_font::get_last_error());
+	lua_setfield(L, -2, "last_error"); // これが Lua の status.last_error になる
+	return 1;
 }
 #endif
 
@@ -466,24 +678,29 @@ void Initialize(lua_State *L, int top) {
 #if UTF8_SDL2_ATLAS
 	// --- minetest.utf8sign.ex サブテーブル ---
 	lua_newtable(L);
-	lua_pushcfunction(L, l_utf8sign_load_atlas_config);
+	lua_pushcfunction(L, l_ex_load_atlas_config);
 	lua_setfield(L, -2, "load_atlas_config");
-	// (今後追加する) get_cache_size などをここに
+	lua_pushcfunction(L, l_ex_get_atlas_status);
+	lua_setfield(L, -2, "get_atlas_status");
+	lua_pushcfunction(L, l_ex_get_char_cache);
+	lua_setfield(L, -2, "get_char_cache");
+	lua_pushcfunction(L, l_ex_get_page_cache);
+	lua_setfield(L, -2, "get_page_cache");
 	lua_setfield(L, -2, "ex");
 #endif
 
 #if UTF8_SDL2_FREETYPE
 	// --- minetest.utf8sign.ft サブテーブル ---
 	lua_newtable(L); 
-	lua_pushcfunction(L, l_get_cache_count);
+	lua_pushcfunction(L, l_ft_get_cache_count);
 	lua_setfield(L, -2, "get_cache_count");
-	lua_pushcfunction(L, l_get_cache_size);
+	lua_pushcfunction(L, l_ft_get_cache_size);
 	lua_setfield(L, -2, "get_cache_size");
-	lua_pushcfunction(L, l_set_cache_size);
+	lua_pushcfunction(L, l_ft_set_cache_size);
 	lua_setfield(L, -2, "set_cache_size");
-	lua_pushcfunction(L, l_clear_cache);
+	lua_pushcfunction(L, l_ft_clear_cache);
 	lua_setfield(L, -2, "clear_cache");
-	lua_pushcfunction(L, l_get_debug_status); // FT用デバッグとしてここに配置
+	lua_pushcfunction(L, l_ft_get_debug_status); // FT用デバッグとしてここに配置
 	lua_setfield(L, -2, "get_debug_status");
 	lua_setfield(L, -2, "ft"); // utf8sign.ft として登録
 #endif

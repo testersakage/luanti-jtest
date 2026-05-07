@@ -1,20 +1,46 @@
--- mod_utf8sign_sample/init.lua
-local S = minetest.get_translator("mod_utf8sign_sample")
+-- mod_utf8signEX_sample/init.lua
+local S = minetest.get_translator("mod_utf8signex_sample")
+local modpath = minetest.get_modpath(minetest.get_current_modname())
 
--- --- 1. C++エンジンへの物差し通知 ---
-if minetest.utf8sign then
+-- --- 1. 魔導書 (Atlasの切り出しルール) の召喚 ---
+if minetest.utf8sign and minetest.utf8sign.ex.load_atlas_config then
+	minetest.utf8sign.ex.load_atlas_config(modpath .. "/pixelmplus_12.json")
+	print("ACTION [Lua]: init.lua: load atlas config file")
+end
+local prof = minetest.utf8sign.ex.get_atlas_status("PixelMplus_12px")
+if prof then
+    print("--- Atlas Profile Status ---")
+    print("Active ID:  " .. (prof.active_id or "nil"))
+    print("Path:       " .. (prof.path or "nil"))
+    print("File Pattern: " .. (prof.file_pattern or "nil"))
+    print("Grid Columns: " .. (prof.grid_columns or "0"))
+    print("Grid Size:" .. (prof.grid_size or "0"))
+    print("Glyph Width:" .. (prof.glyph_w or "0"))
+    print("Glyph Height:" .. (prof.glyph_h or "0"))
+    print("Alpha Reverse:" .. tostring(prof.alpha_reverse))
+    print("----------------------------")
+else
+    print("Error: Profile not found!")
+end
+-- --- 2. C++エンジンへの詳細設定 (Config転送) ---
+if minetest.utf8sign and minetest.utf8sign.set_config then
 	minetest.utf8sign.set_config({
-		st_atlas = {
-			st_line_height = 14,
-			st_max_lines = 4,
-			st_char_w_han = 6,
-			st_char_w_zen = 12,
+		atlas = {
+			-- 旧版互換とFT版の折衷。12pxフォントに合わせた黄金比
+			ex_line_height = 14,
+			ex_max_lines = 4,
+			ex_char_w_han = 6,
+			ex_char_w_zen = 12,
+--			alpha_reverse = false,
+--			grid_size = 14,
+
+
 		}
 	})
 end
 
 --定数
-local ST_SIGN_WIDTH = 115 -- 看板文字用テクスチャのサイズ（幅）
+local EX_SIGN_WIDTH = 115 -- 看板文字用テクスチャのサイズ（幅）
 
 -- sound setting
 local sounds = {}
@@ -43,23 +69,25 @@ end
 -- 文字更新用の関数
 local function update_sign_visual(pos, text)
 	local tex = "utf8_blank.png"
+
 	if text ~= "" then
-		-- 115x82キャンバス、左余白15、上余白14、黒色
-		tex = "[utf8combine:" .. ST_SIGN_WIDTH .. "x82:15,14@000000=" .. text .. "]"
+		-- 文字列を数字の列に変換！ "あ" -> "12345"
+		local spec_list = table.concat({ utf8.codepoint(text, 1, -1) }, ",")
+		tex = "[utf8combineex:" .. EX_SIGN_WIDTH .. "x84:15,14@000000:UTF8:" .. spec_list .. "]"
 		print("DEBUG_LUA_TEX: " .. tex) -- これをターミナルに表示させる
 	end
 
 	local objects = minetest.get_objects_inside_radius(pos, 0.5)
 	for _, obj in ipairs(objects) do
 		local ent = obj:get_luaentity()
-		if ent and ent.name == "mod_utf8sign_sample:text_entity" then
+		if ent and ent.name == "mod_utf8signex_sample:text_entity" then
 			obj:set_properties({textures = {tex}})
 		end
 	end
 end
 
 -- --- 3. 文字表示プレート(Entity)の定義 ---
-minetest.register_entity("mod_utf8sign_sample:text_entity", {
+minetest.register_entity("mod_utf8signex_sample:text_entity", {
 	visual = "upright_sprite",
 	visual_size = {x = 0.875, y = 0.625}, 
 	textures = {"utf8_blank.png"}, -- デフォルトは透明
@@ -80,10 +108,10 @@ minetest.register_entity("mod_utf8sign_sample:text_entity", {
 })
 
 -- --- 4. 看板登録用ヘルパー ---
-local function register_utf8_sign(material, desc, groups, sounds)
+local function register_utf8_signex(material, desc, groups, sounds)
 	-- soundsが渡されていない（nil）場合の安全装置
 	sounds = sounds or {}
-	minetest.register_node("mod_utf8sign_sample:sign_" .. material, {
+	minetest.register_node("mod_utf8signex_sample:sign_" .. material, {
 		description = desc,
 		drawtype = "nodebox",
 		tiles = {"utf8_sign_wall_" .. material .. ".png"},
@@ -112,7 +140,7 @@ local function register_utf8_sign(material, desc, groups, sounds)
 		on_construct = function(pos)
 			local node = minetest.get_node(pos)
 			local d = get_sign_offsets_and_rot(node.param2)
-			local obj = minetest.add_entity({x = pos.x + d.x, y = pos.y + d.y, z = pos.z + d.z}, "mod_utf8sign_sample:text_entity")
+			local obj = minetest.add_entity({x = pos.x + d.x, y = pos.y + d.y, z = pos.z + d.z}, "mod_utf8signex_sample:text_entity")
 			if obj then obj:set_rotation({x = d.pitch, y = d.yaw, z = 0}) end
 
 			local formspec = 
@@ -136,7 +164,7 @@ local function register_utf8_sign(material, desc, groups, sounds)
 			for _, obj in ipairs(objects) do
 				local ent = obj:get_luaentity()
 				-- 自分のModのエンティティなら問答無用で削除
-				if ent and ent.name == "mod_utf8sign_sample:text_entity" then
+				if ent and ent.name == "mod_utf8signex_sample:text_entity" then
 					obj:remove()
 				end
 			end
@@ -148,7 +176,6 @@ local function register_utf8_sign(material, desc, groups, sounds)
 			if not fields.save then
 				return
 			end
---			if not fields.quit then return end
 
 			local text = fields.text or ""
 			local meta = minetest.get_meta(pos)
@@ -174,11 +201,11 @@ elseif minetest.get_modpath("mcl_sounds") then
 end
 
 -- 木の看板
-register_utf8_sign("wood", S("Wooden Sign (UTF-8 Atlas)"), 
+register_utf8_signex("wood", S("Wooden Sign (UTF-8 SDL2 Atlas)"), 
 	{choppy = 2, attached_node = 1, flammable = 2, oddly_breakable_by_hand = 3},
 	wood_sounds)
 
 -- 鉄の看板
-register_utf8_sign("steel", S("Steel Sign (UTF-8 Atlas)"), 
+register_utf8_signex("steel", S("Steel Sign (UTF-8 SDL2 Atlas)"), 
 	{cracky = 2, attached_node = 1},
 	steel_sounds)
