@@ -1,17 +1,24 @@
 // src/script/common/l_utf8sign.h
 #pragma once
 
+// compile switch
+#ifndef UTF8_ATLAS
+    #define UTF8_ATLAS 0        // 標準Atlas (Irrlicht依存)
+#endif
+
+#ifndef UTF8_SDL2_ATLAS
+    #define UTF8_SDL2_ATLAS 1   // EX Atlas (SDL2/SDL_image)
+#endif
+
+#ifndef UTF8_SDL2_FREETYPE
+    #define UTF8_SDL2_FREETYPE 0 // FreeTypeエンジン (SDL2_ttf相当)
+#endif
+
 #include "lua_api/l_base.h"
 #include "irrlichttypes.h"
 #include "SColor.h" 
 #include <string>
 #include <vector>
-
-// 0=無効 , 1=有効
-#define UTF8_ATLAS 0
-#define UTF8_SDL2_ATLAS 1
-#define UTF8_SDL2_FREETYPE 0
-
 
 /* Mineclonia mcl_signs/init.lua の定数設定
 	SIGN_WIDTH = 115		看板の物理サイズ（縦横）

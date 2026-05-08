@@ -1,6 +1,19 @@
 // src/client/utf8_fontengine.h
 #pragma once
 
+// compile switch
+#ifndef UTF8_ATLAS
+    #define UTF8_ATLAS 0
+#endif
+
+#ifndef UTF8_SDL2_ATLAS
+    #define UTF8_SDL2_ATLAS 1
+#endif
+
+#ifndef UTF8_SDL2_FREETYPE
+    #define UTF8_SDL2_FREETYPE 0
+#endif
+
 #include "irrlichttypes.h"
 #include <IImage.h>
 #include <string>
@@ -8,10 +21,6 @@
 #include <map>    // 追加
 #include <list>
 
-// 0=無効 , 1=有効
-#define UTF8_ATLAS 0
-#define UTF8_SDL2_ATLAS 1
-#define UTF8_SDL2_FREETYPE 0
 
 // combine命令パース用構造体
 enum class UTF8EngineType {

@@ -1,4 +1,5 @@
 // src/client/utf8_fontatlas.cpp
+
 #include "utf8_fontatlas.h"
 #include "client/renderingengine.h"
 #include "irrlichttypes.h"
@@ -8,11 +9,6 @@
 #include "../script/common/l_utf8sign.h"
 #include "SDL2/SDL_image.h"
 #include <stdexcept>
-
-// 0=無効 , 1=有効
-#define UTF8_ATLAS 0
-#define UTF8_SDL2_ATLAS 1
-#define UTF8_SDL2_FREETYPE 0
 
 
 // static メンバ変数の実体定義を忘れずに！

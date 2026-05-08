@@ -15,12 +15,6 @@
 //#include <iostream> // これを追加 debug表示用
 
 
-// 0=無効 , 1=有効
-#define UTF8_ATLAS 0
-#define UTF8_SDL2_ATLAS 1
-#define UTF8_SDL2_FREETYPE 0
-
-
 namespace sdl2_font {
 
 	static FT_Library ft_library = nullptr;

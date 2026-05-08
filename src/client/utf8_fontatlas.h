@@ -1,4 +1,18 @@
+// src/client/utf8fontatlas.h
 #pragma once
+
+// compile switch
+#ifndef UTF8_ATLAS
+    #define UTF8_ATLAS 0
+#endif
+
+#ifndef UTF8_SDL2_ATLAS
+    #define UTF8_SDL2_ATLAS 1
+#endif
+
+#ifndef UTF8_SDL2_FREETYPE
+    #define UTF8_SDL2_FREETYPE 0
+#endif
 
 #include "irrlichttypes.h"
 #include <vector>
@@ -6,10 +20,6 @@
 #include <list>
 #include <map>
 
-// 0=無効 , 1=有効
-#define UTF8_ATLAS 0
-#define UTF8_SDL2_ATLAS 1
-#define UTF8_SDL2_FREETYPE 0
 
 //#if UTF8_ATLAS
 // シンプルなピクセルバッファ構造体

@@ -1,6 +1,19 @@
 // src/client_sdl2_font.h
 #pragma once
 
+// compile switch
+#ifndef UTF8_ATLAS
+    #define UTF8_ATLAS 0
+#endif
+
+#ifndef UTF8_SDL2_ATLAS
+    #define UTF8_SDL2_ATLAS 1
+#endif
+
+#ifndef UTF8_SDL2_FREETYPE
+    #define UTF8_SDL2_FREETYPE 0
+#endif
+
 #include <string>
 #include "irrlichttypes.h"
 // ... 既存の宣言の下に ...
