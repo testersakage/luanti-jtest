@@ -4,10 +4,10 @@ local modpath = minetest.get_modpath(minetest.get_current_modname())
 
 -- --- 1. 魔導書 (Atlasの切り出しルール) の召喚 ---
 if minetest.utf8sign and minetest.utf8sign.ex.load_atlas_config then
-	minetest.utf8sign.ex.load_atlas_config(modpath .. "/pixelmplus_12.json")
+	minetest.utf8sign.ex.load_atlas_config(modpath .. "/signs_lib.json")
 	print("ACTION [Lua]: init.lua: load atlas config file")
 end
-local prof = minetest.utf8sign.ex.get_atlas_status("PixelMplus_12px")
+local prof = minetest.utf8sign.ex.get_atlas_status("signs_lib")
 if prof then
     print("--- Atlas Profile Status ---")
     print("Active ID:  " .. (prof.active_id or "nil"))
@@ -27,13 +27,11 @@ if minetest.utf8sign and minetest.utf8sign.set_config then
 	minetest.utf8sign.set_config({
 		atlas = {
 			-- 旧版互換とFT版の折衷。12pxフォントに合わせた黄金比
-			ex_line_height = 14,
-			ex_max_lines = 4,
-			ex_char_w_han = 6,
-			ex_char_w_zen = 12,
---			alpha_reverse = false,
---			grid_size = 14,
 
+			ex_line_height = 18,
+			ex_max_lines = 4,
+			ex_char_w_han = 8,
+			ex_char_w_zen = 16,
 
 		}
 	})
@@ -73,7 +71,7 @@ local function update_sign_visual(pos, text)
 	if text ~= "" then
 		-- 文字列を数字の列に変換！ "あ" -> "12345"
 		local spec_list = table.concat({ utf8.codepoint(text, 1, -1) }, ",")
-		tex = "[utf8combineex:" .. EX_SIGN_WIDTH .. "x84:15,14@000000:UTF8:" .. spec_list .. "]"
+		tex = "[utf8combineex:" .. EX_SIGN_WIDTH .. "x84:7,7@000000:UTF8:" .. spec_list .. "]"
 		print("DEBUG_LUA_TEX: " .. tex) -- これをターミナルに表示させる
 	end
 
