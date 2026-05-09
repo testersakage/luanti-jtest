@@ -18,7 +18,6 @@
 #include "util/numeric.h"
 #include "util/strfnd.h"
 
-
 ////////////////////////////////
 // SourceImageCache Functions //
 ////////////////////////////////
@@ -1039,7 +1038,6 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 	else
 	{
 		// A special texture modification
-
 		/*
 			[crack[o][:<tiles>]:<frame_count>:<frame>
 			Adds a cracking texture
@@ -1083,21 +1081,95 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 				}
 			}
 		}
+#if UTF8_SDL2_ATLAS
+		// imagesource.cpp 内
+		else if (str_starts_with(part_of_name, "[utf8combineex"))
+		{
+#if UTF8_DEBUG
+//			if (str_starts_with(part_of_name, "[utf8combineex")) {
+				actionstream << "ImageSource: Matched [UTF-8 SDL2 Atlas]" << std::endl;
+//			} else if (str_starts_with(part_of_name, "[utf8combineft")) {
+//				actionstream << "DEBUG_COMPARE: MATCHED FT!" << std::endl;
+//			}
+#endif
+			Strfnd sf(part_of_name);
+			sf.next(":");
+			u32 w0 = stoi(sf.next("x"));
+			u32 h0 = stoi(sf.next(":"));
 
+			// 安全装置：2048pxを上限として、巨大すぎるリクエストからシステムを守る
+			if (w0 > 2048 || h0 > 2048) {
+				errorstream << "utf8combineft: Image size (" << w0 << "x" << h0 << ") exceeds limit (2048)!" << std::endl;
+				return false;
+			}
+
+			// サイズ解析
+			if (!baseimg) {
+				baseimg = driver->createImage(video::ECF_A8R8G8B8, {w0, h0});
+				baseimg->fill(video::SColor(0,0,0,0));
+			}
+
+			// 新設する renderUtf8CombineEx を呼び出す
+			UTF8FontEngine::renderutf8combineex(baseimg, std::string(part_of_name));
+			return true;
+		}
+#endif
+#if UTF8_SDL2_FREETYPE
+		else if (str_starts_with(part_of_name, "[utf8combineft")) // ★第二章：純粋TTF版の窓口
+		{
+#if UTF8_DEBUG
+//			if (str_starts_with(part_of_name, "[utf8combineft")) {
+				actionstream << "ImageSource: Matched [UTF-8 SDL2 FreeType]" << std::endl;
+//			} else if (str_starts_with(part_of_name, "[utf8combine")) {
+//				actionstream << "DEBUG_COMPARE: MATCHED ATLAS!" << std::endl;
+//			}
+#endif
+			Strfnd sf(part_of_name);
+			sf.next(":");
+			u32 w0 = stoi(sf.next("x"));
+			u32 h0 = stoi(sf.next(":"));
+
+			// 安全装置：2048pxを上限として、巨大すぎるリクエストからシステムを守る
+			if (w0 > 2048 || h0 > 2048) {
+				errorstream << "utf8combineft: Image size (" << w0 << "x" << h0 << ") exceeds limit (2048)!" << std::endl;
+				return false;
+			}
+
+			// サイズ解析
+			if (!baseimg) {
+				baseimg = driver->createImage(video::ECF_A8R8G8B8, {w0, h0});
+				baseimg->fill(video::SColor(0,0,0,0));
+			}
+
+			// 新設する FT 専用の丸投げ先
+			UTF8FontEngine::renderutf8combineft(baseimg, std::string(part_of_name));
+
+			return true; // 魔境を回避して脱出！
+		}
+#endif
+#if UTF8_ATLAS
 		/*
 			[utf8combine:WxH:テキスト (あなたの新設命令)
 		*/
 		else if (str_starts_with(part_of_name, "[utf8combine"))
 		{
+#if UTF8_DEBUG
+//			if (str_starts_with(part_of_name, "[utf8combine")) {
+				actionstream << "ImageSource: Matched [UTF-8 Atlas]" << std::endl;
+//			} else if (str_starts_with(part_of_name, "[utf8combine")) {
+//				actionstream << "DEBUG_COMPARE: MATCHED ATLAS!" << std::endl;
+//			}
+#endif
 			Strfnd sf(part_of_name);
 			sf.next(":");
 			u32 w0 = stoi(sf.next("x"));
 			u32 h0 = stoi(sf.next(":"));
-			// ... (w0, h0取得後) ...
-//			if (w0 == 115 && h0 == 115) {
-//				w0 = 192; // 16pxフォントのための黄金サイズ
-//				h0 = 192;
-//			}
+
+			// 安全装置：2048pxを上限として、巨大すぎるリクエストからシステムを守る
+			if (w0 > 2048 || h0 > 2048) {
+				errorstream << "utf8combine: Image size (" << w0 << "x" << h0 << ") exceeds limit (2048)!" << std::endl;
+				return false;
+			}
 
 			if (!baseimg) {
 				baseimg = driver->createImage(video::ECF_A8R8G8B8, {w0, h0});
@@ -1111,7 +1183,7 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 
 			return true; // 1000行の魔境をスルーして即座に脱出！
 		}
-
+#endif
 		/*
 			[combine:WxH:X,Y=filename:X,Y=filename2
 			Creates a bigger texture from any amount of smaller ones

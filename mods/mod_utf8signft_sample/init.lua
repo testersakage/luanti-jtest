@@ -1,20 +1,31 @@
--- mod_utf8sign_sample/init.lua
-local S = minetest.get_translator("mod_utf8sign_sample")
+local S = minetest.get_translator("mod_utf8signft_sample")
 
 -- --- 1. C++エンジンへの物差し通知 ---
 if minetest.utf8sign then
 	minetest.utf8sign.set_config({
-		st_atlas = {
-			st_line_height = 14,
-			st_max_lines = 4,
-			st_char_w_han = 6,
-			st_char_w_zen = 12,
+		ft = {
+			ttf_name = "E:/Fonts/LanaPixel.ttf", 
+--			ttf_name = "E:/Fonts/Monogram.ttf", 
+--			ttf_name = "E:/Fonts/ipagp.ttf", -- IPA Gothic
+--			ttf_name = "E:/Fonts/ipamp.ttf", -- IPA Mincho
+--			ttf_name = "C:/Windows/Fonts/msgothic.ttc",
+--			font_index = 2,
+
+			font_size = 32,
+			baseline_y = 28,
+			antialias   = false,
+
+			ft_line_height = 36,
+			ft_max_lines = 4,
+			ft_char_w_han = 16,
+			ft_char_w_zen = 32,
+			blend_mode = 0, -- ALPHA
 		}
 	})
 end
 
 --定数
-local ST_SIGN_WIDTH = 115 -- 看板文字用テクスチャのサイズ（幅）
+local FT_SIGN_WIDTH = 230 -- 看板文字用テクスチャのサイズ（幅）
 
 -- sound setting
 local sounds = {}
@@ -43,23 +54,25 @@ end
 -- 文字更新用の関数
 local function update_sign_visual(pos, text)
 	local tex = "utf8_blank.png"
+
 	if text ~= "" then
-		-- 115x82キャンバス、左余白15、上余白14、黒色
-		tex = "[utf8combine:" .. ST_SIGN_WIDTH .. "x82:15,14@000000=" .. text .. "]"
+		-- 文字列を数字の列に変換！ "あ" -> "12345"
+		local spec_list = table.concat({ utf8.codepoint(text, 1, -1) }, ",")
+		tex = "[utf8combineft:" .. FT_SIGN_WIDTH .. "x164:16,8@003F00:UTF8:" .. spec_list .. "]"
 		print("DEBUG_LUA_TEX: " .. tex) -- これをターミナルに表示させる
 	end
 
 	local objects = minetest.get_objects_inside_radius(pos, 0.5)
 	for _, obj in ipairs(objects) do
 		local ent = obj:get_luaentity()
-		if ent and ent.name == "mod_utf8sign_sample:text_entity" then
+		if ent and ent.name == "mod_utf8signft_sample:text_entity" then
 			obj:set_properties({textures = {tex}})
 		end
 	end
 end
 
 -- --- 3. 文字表示プレート(Entity)の定義 ---
-minetest.register_entity("mod_utf8sign_sample:text_entity", {
+minetest.register_entity("mod_utf8signft_sample:text_entity", {
 	visual = "upright_sprite",
 	visual_size = {x = 0.875, y = 0.625}, 
 	textures = {"utf8_blank.png"}, -- デフォルトは透明
@@ -80,10 +93,10 @@ minetest.register_entity("mod_utf8sign_sample:text_entity", {
 })
 
 -- --- 4. 看板登録用ヘルパー ---
-local function register_utf8_sign(material, desc, groups, sounds)
+local function register_utf8_signft(material, desc, groups, sounds)
 	-- soundsが渡されていない（nil）場合の安全装置
 	sounds = sounds or {}
-	minetest.register_node("mod_utf8sign_sample:sign_" .. material, {
+	minetest.register_node("mod_utf8signft_sample:sign_" .. material, {
 		description = desc,
 		drawtype = "nodebox",
 		tiles = {"utf8_sign_wall_" .. material .. ".png"},
@@ -112,7 +125,7 @@ local function register_utf8_sign(material, desc, groups, sounds)
 		on_construct = function(pos)
 			local node = minetest.get_node(pos)
 			local d = get_sign_offsets_and_rot(node.param2)
-			local obj = minetest.add_entity({x = pos.x + d.x, y = pos.y + d.y, z = pos.z + d.z}, "mod_utf8sign_sample:text_entity")
+			local obj = minetest.add_entity({x = pos.x + d.x, y = pos.y + d.y, z = pos.z + d.z}, "mod_utf8signft_sample:text_entity")
 			if obj then obj:set_rotation({x = d.pitch, y = d.yaw, z = 0}) end
 
 			local formspec = 
@@ -136,7 +149,7 @@ local function register_utf8_sign(material, desc, groups, sounds)
 			for _, obj in ipairs(objects) do
 				local ent = obj:get_luaentity()
 				-- 自分のModのエンティティなら問答無用で削除
-				if ent and ent.name == "mod_utf8sign_sample:text_entity" then
+				if ent and ent.name == "mod_utf8signft_sample:text_entity" then
 					obj:remove()
 				end
 			end
@@ -148,7 +161,6 @@ local function register_utf8_sign(material, desc, groups, sounds)
 			if not fields.save then
 				return
 			end
---			if not fields.quit then return end
 
 			local text = fields.text or ""
 			local meta = minetest.get_meta(pos)
@@ -174,11 +186,11 @@ elseif minetest.get_modpath("mcl_sounds") then
 end
 
 -- 木の看板
-register_utf8_sign("wood", S("Wooden Sign (UTF-8 Atlas)"), 
+register_utf8_signft("wood", S("Wooden Sign (UTF-8 SDL2 FreeType)"), 
 	{choppy = 2, attached_node = 1, flammable = 2, oddly_breakable_by_hand = 3},
 	wood_sounds)
 
 -- 鉄の看板
-register_utf8_sign("steel", S("Steel Sign (UTF-8 Atlas)"), 
+register_utf8_signft("steel", S("Steel Sign (UTF-8 SDL2 FreeType)"), 
 	{cracky = 2, attached_node = 1},
 	steel_sounds)

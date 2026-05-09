@@ -26,15 +26,46 @@ namespace utf8_53 {
 	// 文字列全体の論理幅の合計を返す (lua utf8.width 相当)
 	int get_string_width(const std::string &s);
 
-	// --- Modern Signboard Logic (12px Atlas Specification) ---
+	// --- 統合：utf8wrap の実体となる 4つの関数 ---
 
-	// 看板上の物理表示幅(pixel)を計算する (半角=6px, 全角=12px)
-	int get_total_pixel_width(const std::string &s);
+	// w21. 文字列の物理表示幅(pixel)を計算 (w01+w11)
+	unsigned int get_text_width(const std::string &text, int han_w = 6, int zen_w = 12);
 
-	// 指定した物理幅(pixel)に収まるように安全にカットする
-	std::string truncate_to_pixel_width(const std::string &s, int max_px);
+	// w22. 指定した物理幅(pixel)に収まるように安全にカット (w02+w13)
+	std::string truncate_text(const std::string &text, unsigned int max_px, int han_w = 6, int zen_w = 12);
 
-		// 指定した物理幅(pixel)で自動改行し、行ごとのリストを返す
-	std::vector<std::string> get_lines(const std::string &s, int max_px);
+	// w23. 手動改行を考慮しない指定幅で自動改行し、行リストを返す (w03+w14)
+	std::vector<std::string> wrap_text(const std::string &text, unsigned int max_px, int han_w = 6, int zen_w = 12);
 
+	// w24. 手動改行を考慮しつつ指定幅で自動改行し、行リストを返す (w03+w12+w14)
+	std::vector<std::string> generate_lines(const std::string &text, unsigned int max_px, int han_w = 6, int zen_w = 12);
+
+/*
+// --- 以下、統合前のラッパー関数 w01~03, w11~14---
+
+// --- 以下、看板用ラッパー関数 (デフォルトは全角12pxフォント基準) ---
+
+	// w01. 看板上の物理表示幅(pixel)を計算する (半角=6px, 全角=12px)
+	int get_total_pixel_width(const std::string &s, int han_w = 6, int zen_w = 12);
+
+	// w02. 指定した物理幅(pixel)に収まるように安全にカットする
+	std::string truncate_to_pixel_width(const std::string &s, int max_px, int han_w = 6, int zen_w = 12);
+
+	// w03. 指定した物理幅(pixel)で自動改行し、行ごとのリストを返す
+	std::vector<std::string> get_lines(const std::string &s, int max_px, int han_w = 6, int zen_w = 12);
+
+// --- 以下、看板用ラッパー関数 (utf8_fontengineからの移設) ---
+
+	// w11. 幅を測る（旧 get_total_pixel_width をこれに統合可能）
+	unsigned int get_text_width(const std::string &text, int han_w = 6, int zen_w = 12);
+
+	// w12. 改行を挿入する（元の wrapText）
+	std::vector<std::string> wrap_text(const std::string &text, unsigned int max_px, int han_w = 6, int zen_w = 12);
+
+	// w13. 切り詰める（旧 truncate_to_pixel_width をこれに統合）
+	std::string truncate_text(const std::string &text, unsigned int max_px, int han_w = 6, int zen_w = 12);
+
+	// w14. 行リスト生成（旧 get_lines と統合。これが一番「知恵」が詰まった本尊になります）
+	std::vector<std::string> generate_lines(const std::string &text, unsigned int max_px, int han_w = 6, int zen_w = 12);
+*/
 } // namespace utf8_53
