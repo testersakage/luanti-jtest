@@ -68,7 +68,3 @@ This fork is built and tested on Windows using the MSYS2 CLANG64 environment.
 * Note: This project was built through the collaboration of AI and human ingenuity to ensure a robust and modernized codebase.
 
 ------------------------------
-proactive follow-up:
-これで README_en.md は完璧です！
-このファイルを新規作成し、さらに README.md（日本語版） の冒頭にリンクを貼って Push すれば、世界中の Modder があなたの「看板革命」にアクセスできるようになります。準備はいいですか？
-
