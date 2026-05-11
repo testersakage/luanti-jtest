@@ -1,25 +1,3 @@
-# --- UTF8Sign Engine Options ---
-option(ENABLE_UTF8_ATLAS "Enable Standard Atlas (Irrlicht)" OFF)
-option(ENABLE_UTF8_SDL2_ATLAS "Enable Extended Atlas (SDL2)" ON)
-option(ENABLE_UTF8_SDL2_FREETYPE "Enable FreeType Engine" OFF)
-
-if(ENABLE_UTF8_ATLAS)
-    add_definitions(-DUTF8_ATLAS=1)
-else()
-    add_definitions(-DUTF8_ATLAS=0)
-endif()
-
-if(ENABLE_UTF8_SDL2_ATLAS)
-    add_definitions(-DUTF8_SDL2_ATLAS=1)
-else()
-    add_definitions(-DUTF8_SDL2_ATLAS=0)
-endif()
-
-if(ENABLE_UTF8_SDL2_FREETYPE)
-    add_definitions(-DUTF8_SDL2_FREETYPE=1)
-else()
-    add_definitions(-DUTF8_SDL2_FREETYPE=0)
-endif()
 
 set(sound_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/sound.cpp)
 

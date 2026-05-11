@@ -4,9 +4,9 @@ local S = minetest.get_translator("mod_utf8signft_sample")
 if minetest.utf8sign then
 	minetest.utf8sign.set_config({
 		ft = {
-			ttf_name = "E:/Fonts/LanaPixel.ttf", 
+--			ttf_name = "E:/Fonts/LanaPixel.ttf", 
 --			ttf_name = "E:/Fonts/Monogram.ttf", 
---			ttf_name = "E:/Fonts/ipagp.ttf", -- IPA Gothic
+			ttf_name = "E:/Fonts/ipagp.ttf", -- IPA Gothic
 --			ttf_name = "E:/Fonts/ipamp.ttf", -- IPA Mincho
 --			ttf_name = "C:/Windows/Fonts/msgothic.ttc",
 --			font_index = 2,

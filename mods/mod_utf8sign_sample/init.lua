@@ -1,6 +1,7 @@
 -- mod_utf8sign_sample/init.lua
 local S = minetest.get_translator("mod_utf8sign_sample")
 
+local modpath = minetest.get_modpath(minetest.get_current_modname())
 -- --- 1. C++エンジンへの物差し通知 ---
 if minetest.utf8sign then
 	minetest.utf8sign.set_config({
@@ -9,6 +10,7 @@ if minetest.utf8sign then
 			st_max_lines = 4,
 			st_char_w_han = 6,
 			st_char_w_zen = 12,
+			st_atlas_path = modpath .. "/textures/unicode_page_%02x.png",
 		}
 	})
 end

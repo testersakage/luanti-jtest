@@ -88,7 +88,7 @@ void UTF8SignManager::loadGrimoire(const std::string &override_path)
 	}
 
 	if (fs::PathExists(grimoire_path)) {
-		actionstream << "UTF8SignManager: Found Atlas config." << std::endl;
+//		actionstream << "UTF8SignManager: Found Atlas config." << std::endl;
 	} else {
 		// あくまで警告に留め、動作は止めない
 		infostream << "UTF8SignManager: Not found Atlas config." << std::endl;
@@ -270,7 +270,7 @@ UTF8SignManager::UTF8SignManager() {
 			if (conf_val > 8) conf_val = 8;
 			st_atlas.page_cache = conf_val;
 		}
-
+/*
 		// ---  パス・テンプレートの設定 ---
 		if (g_settings->exists("utf8_st_atlas_path")) {
 			// 文字列として取得！
@@ -279,11 +279,12 @@ UTF8SignManager::UTF8SignManager() {
 			// そのまま構造体へ格納（これが FontAtlas の loadPage で使われる）
 			st_atlas.st_atlas_path = conf_path;
 		}
+*/
 	}
 
-	actionstream << "UTF8SignManager: Atlas Path: " 
-		<< st_atlas.st_atlas_path << std::endl;
-	actionstream << "UTF8SignManager: Font cache initialized with page: " 
+//	actionstream << "UTF8SignManager: Atlas Path: " 
+//		<< st_atlas.st_atlas_path << std::endl;
+	actionstream << "UTF8SignManager: ST Font cache initialized with page: " 
 		<< st_atlas.page_cache << std::endl;
 #endif
 
@@ -308,7 +309,7 @@ UTF8SignManager::UTF8SignManager() {
 		}
 	}
 
-	actionstream << "UTF8SignManager: Font cache initialized with size: " 
+	actionstream << "UTF8SignManager: EX Font cache initialized with size: " 
 		<< atlas.ex_char_cache << " / page: " << atlas.ex_page_cache << std::endl;
 #endif
 
@@ -323,7 +324,7 @@ UTF8SignManager::UTF8SignManager() {
 		}
 	}
 
-	actionstream << "UTF8SignManager: Font cache initialized with size: " 
+	actionstream << "UTF8SignManager: FT Font cache initialized with size: " 
 		<< ft.cache_size << std::endl;
 #endif
 }
@@ -366,7 +367,13 @@ int l_set_config(lua_State *L) {
 		if (!lua_isnil(L, -1)) {
 			warningstream << "l_utf8sign: 'alpha_reverse' cannot be set via set_config."
 			<< " Please define it in your Atlas JSON." << std::endl;
-		}	*/
+		}
+		lua_pop(L, 1);
+*/
+		lua_getfield(L, -1, "st_atlas_path");
+		if (lua_isstring(L, -1)) {
+			mgr.st_atlas.st_atlas_path = lua_tostring(L, -1);
+		}
 		lua_pop(L, 1);
 	}
 	lua_pop(L, 1);
