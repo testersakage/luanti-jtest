@@ -4,8 +4,10 @@
 
 #include "imagesource.h"
 
+#include "utf8_fontengine.h" // utf8追加
 #include "exceptions.h"
 #include <IFileSystem.h>
+#include <IReadFile.h>
 #include "imagefilters.h"
 #include "renderingengine.h"
 #include "settings.h"
@@ -15,7 +17,6 @@
 #include "util/base64.h"
 #include "util/numeric.h"
 #include "util/strfnd.h"
-
 
 ////////////////////////////////
 // SourceImageCache Functions //
@@ -1037,7 +1038,6 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 	else
 	{
 		// A special texture modification
-
 		/*
 			[crack[o][:<tiles>]:<frame_count>:<frame>
 			Adds a cracking texture
@@ -1067,8 +1067,8 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 				/*
 					Load crack image.
 
-					It is an image with a number of cracking stages
-					horizontally tiled.
+					It is an image with a number of cracking stages,
+					from top to bottom. Tile dimensions: img.width * img.width
 				*/
 				video::IImage *img_crack = m_sourcecache.getOrLoad(
 					"crack_anylength.png");
@@ -1080,6 +1080,112 @@ bool ImageSource::generateImagePart(std::string_view part_of_name,
 					img_crack->drop();
 				}
 			}
+		}
+		//	[utf8combineex:WxH:offx,offy@000000:UTF8:<codepoint>]
+		else if (str_starts_with(part_of_name, "[utf8combineex"))
+		{
+#if UTF8_SDL2_ATLAS
+#if UTF8_DEBUG
+//			if (str_starts_with(part_of_name, "[utf8combineex")) {
+				actionstream << "ImageSource: Matched [UTF-8 SDL2 Atlas]" << std::endl;
+//			} else if (str_starts_with(part_of_name, "[utf8combineft")) {
+//				actionstream << "DEBUG_COMPARE: MATCHED FT!" << std::endl;
+//			}
+#endif
+			Strfnd sf(part_of_name);
+			sf.next(":");
+			u32 w0 = stoi(sf.next("x"));
+			u32 h0 = stoi(sf.next(":"));
+
+			// 安全装置：2048pxを上限として、巨大すぎるリクエストからシステムを守る
+			if (w0 > 2048 || h0 > 2048) {
+				errorstream << "utf8combineft: Image size (" << w0 << "x" << h0 << ") exceeds limit (2048)!" << std::endl;
+				return false;
+			}
+
+			// サイズ解析
+			if (!baseimg) {
+				baseimg = driver->createImage(video::ECF_A8R8G8B8, {w0, h0});
+				baseimg->fill(video::SColor(0,0,0,0));
+			}
+
+			// 新設する renderUtf8CombineEx を呼び出す
+			UTF8FontEngine::renderutf8combineex(baseimg, std::string(part_of_name));
+			return true;
+#else
+			return false;
+#endif
+		}
+		//	[utf8combineft:WxH:offx,offy@000000:UTF8:<codepoint>]
+		else if (str_starts_with(part_of_name, "[utf8combineft")) // ★第二章：純粋TTF版の窓口
+		{
+#if UTF8_SDL2_FREETYPE
+#if UTF8_DEBUG
+//			if (str_starts_with(part_of_name, "[utf8combineft")) {
+				actionstream << "ImageSource: Matched [UTF-8 SDL2 FreeType]" << std::endl;
+//			} else if (str_starts_with(part_of_name, "[utf8combine")) {
+//				actionstream << "DEBUG_COMPARE: MATCHED ATLAS!" << std::endl;
+//			}
+#endif
+			Strfnd sf(part_of_name);
+			sf.next(":");
+			u32 w0 = stoi(sf.next("x"));
+			u32 h0 = stoi(sf.next(":"));
+
+			// 安全装置：2048pxを上限として、巨大すぎるリクエストからシステムを守る
+			if (w0 > 2048 || h0 > 2048) {
+				errorstream << "utf8combineft: Image size (" << w0 << "x" << h0 << ") exceeds limit (2048)!" << std::endl;
+				return false;
+			}
+
+			// サイズ解析
+			if (!baseimg) {
+				baseimg = driver->createImage(video::ECF_A8R8G8B8, {w0, h0});
+				baseimg->fill(video::SColor(0,0,0,0));
+			}
+
+			// 新設する FT 専用の丸投げ先
+			UTF8FontEngine::renderutf8combineft(baseimg, std::string(part_of_name));
+			return true;
+#else
+			return false;
+#endif
+		}
+		//	[utf8combine:WxH:offx,offy@000000=テキスト]
+		else if (str_starts_with(part_of_name, "[utf8combine"))
+		{
+#if UTF8_ATLAS
+#if UTF8_DEBUG
+//			if (str_starts_with(part_of_name, "[utf8combine")) {
+				actionstream << "ImageSource: Matched [UTF-8 Atlas]" << std::endl;
+//			} else if (str_starts_with(part_of_name, "[utf8combine")) {
+//				actionstream << "DEBUG_COMPARE: MATCHED ATLAS!" << std::endl;
+//			}
+#endif
+			Strfnd sf(part_of_name);
+			sf.next(":");
+			u32 w0 = stoi(sf.next("x"));
+			u32 h0 = stoi(sf.next(":"));
+
+			// 安全装置：2048pxを上限として、巨大すぎるリクエストからシステムを守る
+			if (w0 > 2048 || h0 > 2048) {
+				errorstream << "utf8combine: Image size (" << w0 << "x" << h0 << ") exceeds limit (2048)!" << std::endl;
+				return false;
+			}
+
+			if (!baseimg) {
+				baseimg = driver->createImage(video::ECF_A8R8G8B8, {w0, h0});
+				baseimg->fill(video::SColor(0,0,0,0));
+			}
+
+			// ロジックの本体は別ファイル (utf8_fontengine.cpp) に丸投げ
+			// part_of_name には "[utf8combine:100x50:..." が丸ごと入っています
+			// part_of_name の後ろに .data() を付けるか、std::string() で囲む
+			UTF8FontEngine::renderUtf8Combine(baseimg, std::string(part_of_name));
+			return true;
+#else
+			return false; // コンパイルでoffの場合は false で戻る。
+#endif
 		}
 		/*
 			[combine:WxH:X,Y=filename:X,Y=filename2

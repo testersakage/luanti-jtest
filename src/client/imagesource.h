@@ -4,6 +4,19 @@
 
 #pragma once
 
+// compile switch
+#ifndef UTF8_ATLAS
+    #define UTF8_ATLAS 0
+#endif
+
+#ifndef UTF8_SDL2_ATLAS
+    #define UTF8_SDL2_ATLAS 1
+#endif
+
+#ifndef UTF8_SDL2_FREETYPE
+    #define UTF8_SDL2_FREETYPE 0
+#endif
+
 #include <IImage.h>
 #include <unordered_map>
 #include <set>

@@ -1,148 +1,77 @@
-<div align="center">
-    <img src="textures/base/pack/logo.png" width="32%">
-    <h1>Luanti (formerly Minetest)</h1>
-    <img src="https://github.com/luanti-org/luanti/workflows/build/badge.svg" alt="Build Status">
-    <a href="https://hosted.weblate.org/engage/minetest/?utm_source=widget"><img src="https://hosted.weblate.org/widgets/minetest/-/svg-badge.svg" alt="Translation status"></a>
-    <a href="https://www.gnu.org/licenses/old-licenses/lgpl-2.1.en.html"><img src="https://img.shields.io/badge/license-LGPLv2.1%2B-blue.svg" alt="License"></a>
-</div>
-<br>
+------------------------------
+## Luanti Unicode Modernization Project (V4 Engine "EX")
 
-Luanti is a free open-source voxel game engine with easy modding and game creation.
+[English Documentation (README_en.md)](./README_en.md)
 
-Copyright (C) 2010-2026 Perttu Ahola <celeron55@gmail.com>
-and contributors (see source file comments and the version control log)
+このリポジトリは、Luanti のテキスト描画システムを Unicode（特に日本語および多言語）に完全対応させ、Minecraft と同等、あるいはそれ以上の描画品質を実現するためのフォークです。
+従来の Lua による低速な画像合成を完全に廃止。C++ エンジン側に直接「Unicode Glyph API」を実装し、さらに SDL2 / SDL_image を統合した 「EX Atlas エンジン」 により、あらゆるフォント規格を動的に飲み込む柔軟性と圧倒的なパフォーマンスを両立しました。
 
-Table of Contents
-------------------
+<img width=600, height=225, src="https://github.com/testersakage/luanti-jtest/blob/master/screenshots/samplesign.png"></img>
+## 🔧 このフォークの革新的な機能
 
-1. [Further Documentation](#further-documentation)
-2. [Default Controls](#default-controls)
-3. [Paths](#paths)
-4. [Configuration File](#configuration-file)
-5. [Command-line Options](#command-line-options)
-6. [Compiling](#compiling)
-7. [Docker](#docker)
-8. [Version Scheme](#version-scheme)
+## 1. 動的定義エンジン "DDE" (Dynamic Definition Engine) [NEW]
 
+* 規格からの解放: 12pxや14pxといった固定規格を廃止。外部JSONファイル（設計図）を読み込むことで、16x16や12x14など、あらゆるグリッドサイズのアトラスに即座に対応します。
+* プロファイル切り替え: Mod側からJSONを指定するだけで、リビルドなしで看板のフォントセットを動的に切り替え可能です。
 
-Further documentation
-----------------------
-- Website: https://www.luanti.org/
-- Luanti Documentation: https://docs.luanti.org/
-- Forum: https://forum.luanti.org/
-- GitHub: https://github.com/luanti-org/luanti/
-- [Developer documentation](doc/developing/)
-- [doc/](doc/) directory of source distribution
+## 2. SDL2 / SDL_image による高精細レンダリング [NEW]
 
-Default controls
-----------------
-All controls are re-bindable using settings.
-Some can be changed in the key config dialog in the settings tab.
+* マルチフォーマット対応: SDL_imageの導入により、PNG/JPG等の様々な画像形式をサポート。
+* 透過錬金術 (Alpha Reverse): 背景が黒塗りの古いアセットでも、エンジン側でアルファチャンネルを反転・生成し、最新の透過看板として蘇らせます。
+* ピクセルパーフェクト: 画像の実サイズから1ピクセルあたりの歩幅を逆算する cell_w ロジックを搭載。1pxの狂いもない完璧な文字間隔を実現しました。
 
-| Button                        | Action                                                         |
-|-------------------------------|----------------------------------------------------------------|
-| Move mouse                    | Look around                                                    |
-| W, A, S, D                    | Move                                                           |
-| Space                         | Jump/move up                                                   |
-| Shift                         | Sneak/move down                                                |
-| Q                             | Drop itemstack                                                 |
-| Shift + Q                     | Drop single item                                               |
-| Left mouse button             | Dig/punch/use                                                  |
-| Right mouse button            | Place/use                                                      |
-| Shift + right mouse button    | Build (without using)                                          |
-| I                             | Inventory menu                                                 |
-| Mouse wheel                   | Select item                                                    |
-| 0-9                           | Select item                                                    |
-| Z                             | Zoom (needs zoom privilege)                                    |
-| T                             | Chat                                                           |
-| /                             | Command                                                        |
-| Esc                           | Pause menu/abort/exit (pauses only singleplayer game)          |
-| +                             | Increase view range                                            |
-| -                             | Decrease view range                                            |
-| K                             | Enable/disable fly mode (needs fly privilege)                  |
-| J                             | Enable/disable fast mode (needs fast privilege)                |
-| H                             | Enable/disable noclip mode (needs noclip privilege)            |
-| E                             | Aux1 (Move fast in fast mode. Games may add special features)  |
-| C                             | Cycle through camera modes                                     |
-| V                             | Cycle through minimap modes                                    |
-| Shift + V                     | Change minimap orientation                                     |
-| F1                            | Hide/show HUD                                                  |
-| F2                            | Hide/show chat                                                 |
-| F3                            | Disable/enable fog                                             |
-| F4                            | Disable/enable camera update (Mapblocks are not updated anymore when disabled, disabled in release builds)  |
-| F5                            | Cycle through debug information screens                        |
-| F6                            | Cycle through profiler info screens                            |
-| F10                           | Show/hide console                                              |
-| F12                           | Take screenshot                                                |
+## 3. C++/Lua 同期インフラ (SignManager)
 
-Paths
------
-Locations:
+* 共通の物差し: minetest.utf8sign API を通じて、サーバー（Lua）とクライアント（C++）が全く同じ文字幅データを共有。オンライン環境での表示ズレを根絶しました。
+* 高度なレイアウト解析: 東アジア文字幅（EAW）に対応し、半角を1、全角を2として正確に判定。プロフェッショナルなワードラップを提供します。
 
-* `bin`   - Compiled binaries
-* `share` - Distributed read-only data
-* `user`  - User-created modifiable data
+## 4. マルチエンジン・ハイブリッド構成 [UPDATED]
 
-Where each location is on each platform:
+* 旧Atlas (Standard) の洗練: 前回リリースしたIrrlicht（Luanti標準）ベースのエンジンも継続サポート。V4の知恵をフィードバックし、12px/14px判定の安定性をさらに向上させました。
+* FreeType (FT) エンジンの内蔵: アトラス画像すら不要とする、SDL2_ttf / FreeType によるダイレクトレンダリング機能も搭載。TrueTypeフォント（TTF/OTF）をそのまま看板に映し出す究極の柔軟性を提供します。
+* コンパイルオプション制御: 各エンジンはビルド時のフラグ（#ifdef）で個別に有効化可能。環境や用途に合わせた最適なバイナリを作成できます。
 
-* Windows .zip / RUN_IN_PLACE source:
-    * `bin`   = `bin`
-    * `share` = `.`
-    * `user`  = `.`
-* Windows installed:
-    * `bin`   = `C:\Program Files\Minetest\bin (Depends on the install location)`
-    * `share` = `C:\Program Files\Minetest (Depends on the install location)`
-    * `user`  = `%APPDATA%\Minetest` or `%MINETEST_USER_PATH%`
-* Linux installed:
-    * `bin`   = `/usr/bin`
-    * `share` = `/usr/share/minetest`
-    * `user`  = `~/.minetest` or `$MINETEST_USER_PATH`
-* macOS:
-    * `bin`   = `Contents/MacOS`
-    * `share` = `Contents/Resources`
-    * `user`  = `Contents/User` or `~/Library/Application Support/minetest` or `$MINETEST_USER_PATH`
+------------------------------
+## 🛠️ ビルド方法 (How to Build)
+Windows 上の MSYS2 CLANG64 環境でビルドと動作確認を行っています。
 
-Worlds can be found as separate folders in: `user/worlds/`
+   1. 依存ライブラリの導入:
+   MSYS2ターミナルで以下を実行し、SDL2関連のパッケージを導入してください。
+   
+   pacman -S mingw-w64-clang-x86_64-SDL2_image
+   
+   2. ビルドの実行:
+   
+   cmake . -B build -DCMAKE_BUILD_TYPE=Release -G "MinGW Makefiles" -DENABLE_UTF8_SDL2_ATLAS=ON
+   cmake --build build -j$(nproc)
+   
+   
+------------------------------
+## 🚀 導入と利用例 (Usage)
+本エンジンは、既存の膨大な看板Mod資産を最大限に活用しつつ、最新の描画クオリティを提供することを目的としています。
+## 1. 既存Modアセット（signs_lib）の活用
+本エンジンは、Luantiで最も普及している [signs_lib](https://github.com/minetest-mods/font_api) のフォントアセット（GNU Unifont形式）を公式にサポートしています。
 
-Configuration file
-------------------
-- Default location:
-    `user/minetest.conf`
-- This file is created by closing Luanti for the first time.
-- A specific file can be specified on the command line:
-    `--config <path-to-file>`
-- A run-in-place build will look for the configuration file in
-    `location_of_exe/../minetest.conf` and also `location_of_exe/../../minetest.conf`
+* 素材の自動認識: signs_lib がインストールされている環境であれば、同梱のサンプルModが自動的にそのテクスチャパスを検索し、EXエンジンへと登録します。
+* 透過リマスター: 特殊な画像加工なしで、既存の「黒背景・白抜き」アセットを背景透過のドットフォントとして美しく表示します。
 
-Command-line options
---------------------
-- Use `--help`
+## 2. サンプルModによる導入 (mod_utf8signex_sample)
+リポジトリに同梱されている mod_utf8signex_sample を mods/ フォルダに配置して有効化してください。
 
-Compiling
----------
+* ContentDB対応: ContentDB等からダウンロードしたアセットのパスを自動解決するように構成されています。
+* JSONによる動的定義: C++コードを書き換えることなく、JSONファイルを置くだけで新しいフォントアトラスを自由に追加できます。
 
-- [Compiling - common information](doc/compiling/README.md)
-- [Compiling on GNU/Linux](doc/compiling/linux.md)
-- [Compiling on Windows](doc/compiling/windows.md)
-- [Compiling on MacOS](doc/compiling/macos.md)
+## ⚠️ 注意事項：既存Modとの互換性について
 
-Docker
-------
+* アセット利用の制限: 本エンジンは signs_lib 等のフォント画像（アセット）を拝借して描画を行いますが、それら他製Modが提供する看板ノード（Entity/Node）そのものの描画ロジックを自動的に書き換えるものではありません。
+* 看板Modの改造: 既存Modの看板で本エンジンの高精細描画（EX Atlas）を利用したい場合は、そのMod側のLuaコードを修正し、描画命令を [utf8combineex:... 形式へ書き換える必要があります。
+* 推奨環境: 本エンジンの機能をフルに体験するには、同梱のサンプルMod、または本エンジンを前提に設計されたModと組み合わせて使用することを推奨します。
 
-- [Developing minetestserver with Docker](doc/developing/docker.md)
-- [Running a server with Docker](doc/docker_server.md)
+------------------------------
+## 📘 English Overview
+This fork modernizes the Luanti text rendering system for full Unicode support. The newly implemented V4 "EX" Engine leverages SDL2 and a Dynamic Definition Engine (DDE) to support any font atlas specification (16x16, 12x14, etc.) via external JSON profiles. It features high-precision glyph extraction, automatic alpha-channel generation for legacy assets, and pixel-perfect synchronization between Lua and C++.
+------------------------------
+## 📝 補足
+AIと人間の協力により、強固なコードベースを構築しました。
+------------------------------
 
-Version scheme
---------------
-We use `major.minor.patch` since 5.0.0-dev. Prior to that we used `0.major.minor`.
-
-- Major is incremented when the release contains breaking changes, all other
-numbers are set to 0.
-- Minor is incremented when the release contains new non-breaking features,
-patch is set to 0.
-- Patch is incremented when the release only contains bugfixes and very
-minor/trivial features considered necessary.
-
-Since 5.0.0-dev and 0.4.17-dev, the dev notation refers to the next release,
-i.e.: 5.0.0-dev is the development version leading to 5.0.0.
-Prior to that we used `previous_version-dev`.

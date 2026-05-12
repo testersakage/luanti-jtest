@@ -1,0 +1,15 @@
+{
+    "target_atlases": [
+        {
+            "id": "signs_lib",
+            "path": "mods/signs_lib/textures/unifont",
+            "comment": "Signs_lib Unifont https://forum.luanti.org/viewtopic.php?t=13762",
+            "file_pattern": "signs_lib_uni%02x.png",
+            "grid_columns": 16,
+            "grid_size": 16,
+            "glyph_w": 16,
+            "glyph_h": 16,
+            "alpha_reverse": true
+        }
+    ]
+}

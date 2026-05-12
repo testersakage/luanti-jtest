@@ -1,0 +1,15 @@
+{
+    "target_atlases": [
+        {
+            "id": "PixelMplus_12px",
+            "path": "mods/mod_utf8signex_sample/textures", 
+            "comment": "https://github.com/itouhiro/PixelMplus",
+            "file_pattern": "unicode_page_%02x.png",
+            "grid_columns": 32,
+            "grid_size": 14,
+            "glyph_w": 12,
+            "glyph_h": 14,
+            "alpha_reverse": false
+        }
+    ]
+}

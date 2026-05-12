@@ -339,6 +339,16 @@ HTTPFetchOngoing::HTTPFetchOngoing(const HTTPFetchRequest &request_,
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER,
 		g_settings->getBool("curl_verify_cert") ? 1L : 0L);
+
+	// 【職人のバグ修正】仕様通り minetest.conf から証明書パスを読み込む
+	std::string cacert = g_settings->get("curl_cacert");
+	
+	// もし conf が空なら、デフォルトとして実行ファイルの真横の ca-bundle.crt をセットする
+	if (cacert.empty()) {
+		cacert = "ca-bundle.crt";
+	}
+	
+	curl_easy_setopt(curl, CURLOPT_CAINFO, cacert.c_str());
 }
 
 CURLcode HTTPFetchOngoing::start(CURLM *multi_)
