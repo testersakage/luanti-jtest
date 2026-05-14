@@ -390,7 +390,7 @@ void UTF8FontEngine::renderutf8combineex(void *dest_img_ptr, const std::string &
 	if (task.raw_text.empty() && task.codes.empty()) return;
 
 	// 2. 司令塔（Manager）から指示書を取得
-	auto &cfg = UTF8SignManager::getInstance()->atlas;
+	auto &cfg = UTF8SignManager::getInstance()->ex;
 
 	// 3. 改行位置の計算（utf8_53の知恵を拝借）
 	u32 start_x = (task.start_x == 0) ? cfg.ex_padding_x : task.start_x;
@@ -405,25 +405,11 @@ void UTF8FontEngine::renderutf8combineex(void *dest_img_ptr, const std::string &
 	for (const std::string &line_str : lines) {
 		std::vector<int> codes = utf8_53::to_codepoints(line_str);
 		u32 cursor_x = start_x;
-
+/*
 		for (u32 code : codes) {
 			//  二段構えキャッシュ完結型の画像取得
 			ImageRGBA glyph = UTF8FontAtlas::getGlyphImageEX(code);
 
-//	actionstream << "RenderUTF8CombineEX: chechk glyph" << std::endl;
-/*
-	if (!glyph.data.empty()) {
-	actionstream << "RenderUTF8CombineEX: exist data in glyph" << std::endl;
-        // ファイル名を "glyph_0x[16進数コード].bmp" にする
-        char bmp_name[64];
-        snprintf(bmp_name, sizeof(bmp_name), "glyph_0x%04x.bmp", code);
-
-        // まだこの文字の検品が終わっていない（ファイルがない）場合だけ保存
-        if (!file_exists(bmp_name)) {
-            saveToBMP(glyph, bmp_name); // 先ほどのBMP保存関数
-        }
-    }
-*/
 			if (!glyph.data.empty()) {
 				// 半角・全角の歩幅判定
 				bool is_half = (code <= 0x00FF) || (code >= 0xFF61 && code <= 0xFF9F);
@@ -452,6 +438,55 @@ void UTF8FontEngine::renderutf8combineex(void *dest_img_ptr, const std::string &
 					}
 				}
 				cursor_x += advance;
+			}
+		}
+*/
+		for (u32 code : codes) {
+			// 二段構えキャッシュ完結型の画像取得
+			ImageRGBA glyph = UTF8FontAtlas::getGlyphImageEX(code);
+
+			if (!glyph.data.empty()) {
+				// ─── 【消失前再現】Config内の動的ルールを使って現場で全半角ジャッジ ───
+				bool is_half = false;
+				
+				// ASCII と 半角カナ は固定で半角扱い（安全ガード）
+				if ((code >= 0x0020 && code <= 0x007E) || (code >= 0xFF61 && code <= 0xFF9F)) {
+					is_half = true;
+				} else {
+					// 魔導書（JSON）から Config に同期された例外範囲を現場でスキャン
+					for (const auto &range : cfg.ex_half_width_ranges) {
+						if (code >= range.start && code <= range.end) {
+							is_half = true;
+							break;
+						}
+					}
+				}
+
+				// 判定された正しい歩幅を適用（半角なら 8px、全角なら 16px）
+				u32 advance = is_half ? cfg.ex_char_w_han : cfg.ex_char_w_zen;
+
+				// --- ピクセル転写（この上限を advance に絞ることで黒背景を完全遮断！） ---
+				for (int y = 0; y < glyph.height; y++) {
+					u32 dy = cursor_y + y;
+					if (dy >= dest_img->getDimension().Height) break;
+
+					for (int x = 0; x < (int)advance; x++) {
+						if (x >= glyph.width) break;
+						u32 dx = cursor_x + x;
+						if (dx >= dest_img->getDimension().Width) break;
+
+						// Atlas（モノクロPNG）の Alpha を拾って色を乗せる
+						int src_idx = (y * glyph.width + x) * 4;
+						u8 alpha = glyph.data[src_idx + 3];
+
+						if (alpha > 0) {
+							video::SColor color = task.color;
+							color.setAlpha(alpha);
+							dest_img->setPixel(dx, dy, color);
+						}
+					}
+				}
+				cursor_x += advance; // 正しい歩幅（8px または 16px）だけ右に進める
 			}
 		}
 		cursor_y += cfg.ex_line_height;

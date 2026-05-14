@@ -256,12 +256,22 @@ const ImageRGBA &UTF8FontAtlas::loadPageEX(int page)
 
 	// 「仕様書」に従ってパスを生成
 	char filename[512];
-	// resolved.full_path がフォルダ、def.file_pattern がファイル名ルール
 	std::string pattern = resolved.full_path + "/" + resolved.def.file_pattern;
 	snprintf(filename, sizeof(filename), pattern.c_str(), page);
 
-	//  ロードと格納（std::move で所有権をスマートに移譲）
-	ImageRGBA img = load_png_rgbaEX(filename);
+	// ─── 【消失前再現】5.15.2の相対パス迷子（full_path空っぽバグ）を強制救済 ───
+	std::string final_path(filename);
+	if (resolved.full_path.empty() || final_path.find("//") == 0 || final_path.find("/") == 0) {
+		// full_path が死んでいる場合は、魔導書本来の sub_path（例: mods/signs_lib/...）を使って再結合
+		final_path = resolved.def.sub_path + "/" + resolved.def.file_pattern;
+		
+		char fallback_filename[512];
+		snprintf(fallback_filename, sizeof(fallback_filename), final_path.c_str(), page);
+		final_path = fallback_filename;
+	}
+
+	//  ロードと格納（引数を強制救済済みの final_path に差し替える！）
+	ImageRGBA img = load_png_rgbaEX(final_path);
 	infostream << "UTF8FontAtlas: Image Load Check -> Width: " << img.width 
 		<< " Height: " << img.height 
 		<< " DataSize: " << img.data.size() << std::endl;

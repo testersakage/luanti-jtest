@@ -9,7 +9,11 @@
             "grid_size": 16,
             "glyph_w": 16,
             "glyph_h": 16,
-            "alpha_reverse": true
+            "alpha_reverse": true,
+            "half_width_ranges": [
+                {"start": "0x0370", "end": "0x03FF", "_memo": "ギリシャ文字"},
+                {"start": "0x0400", "end": "0x04FF", "_memo": "キリル文字"}
+            ]
         }
     ]
 }

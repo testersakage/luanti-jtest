@@ -17,6 +17,7 @@
 #include "lua_api/l_base.h"
 #include "irrlichttypes.h"
 #include "SColor.h" 
+#include "../../utf8_53.h" 
 #include <string>
 #include <vector>
 
@@ -65,6 +66,7 @@ struct AtlasDefinition {
 	u32 glyph_w = 12;          // 抜き出す幅
 	u32 glyph_h = 14;          // 抜き出す高さ
 	bool alpha_reverse = true; // 反転フラグ
+	std::vector<utf8_53::WidthRange> half_width_ranges; // 半角指定エリアの構造体
 };
 // --- スキャンで見つかった「有効な仕入れ先」の情報 ---
 struct ResolvedAtlas {
@@ -83,9 +85,19 @@ struct UTF8AtlasConfig {
 	u32 ex_padding_y = 0;
 	u32 ex_max_lines = 4;
 	// JSONから引き継いだ情報を保持する場所を追加
-	std::string current_atlas_id = "none";
-	bool alpha_reverse = true;
-	u32 grid_size = 14;
+	std::string ex_current_atlas_id = "none";
+	std::string ex_sub_path;      // 現場の住所
+	std::string ex_file_pattern;  // 画像の命名規則
+	u32 ex_grid_columns = 32;     // atlas画像の文字数（横）
+	u32 ex_grid_size = 14;        // 16pxなどの器
+//	u32 ex_glyph_w = 12;          // 抜き出す幅
+//	u32 ex_glyph_h = 14;          // 抜き出す高さ
+	bool ex_alpha_reverse = true; // 反転フラグ
+
+	// utf8_53 名前空間に定義されている WidthRange 構造体の動的ベクター配列（vector）として保持します。
+	std::vector<utf8_53::WidthRange> ex_half_width_ranges;
+
+	// EX Cache Setting
 	u32 ex_char_cache = 256;
 	u32 ex_page_cache = 4;
 };
@@ -122,7 +134,7 @@ struct UTF8FTConfig {
 	u32 ft_padding_y = 0;
 	SignBlendMode blend_mode = SignBlendMode::OVERWRITE; // デフォルトは上書き
 
-	// Cache Setting
+	// FT Cache Setting
 	u32 cache_size = 256; 
 
 	// 診断用
@@ -145,7 +157,7 @@ public:
 #endif
 
 #if UTF8_SDL2_ATLAS
-	UTF8AtlasConfig atlas;
+	UTF8AtlasConfig ex;
 
 	// 見つかったAtlasを登録する窓口
 //	void registerAtlas(const AtlasDefinition &def, const std::string &path);

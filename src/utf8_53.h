@@ -2,8 +2,31 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <cstdint> // uint32_t の型解決用
 
 namespace utf8_53 {
+
+	// ─── 【消失前再現】UAX #11 動的判定用のインフラ ───
+	struct WidthRange {
+		uint32_t start;
+		uint32_t end;
+		std::string memo;
+	};
+
+	struct GlyphInfo {
+		uint32_t codepoint;  // 文字の識別番号
+		float width_ratio;   // 1.0f = 全角, 0.5f = 半角
+	};
+
+	// JSONから引き継がれた、現在アクティブな半角例外ルール（実体ベクター）
+	extern std::vector<WidthRange> g_half_width_ranges;
+
+	// 判定ルーチン（比率を返す関数）
+	float get_char_width_ratio(uint32_t codepoint);
+
+	// 次の文字と幅情報をセットで取得する窓口（EXエンジン向け）
+	GlyphInfo get_next_glyph_info(const std::string &utf8_text, size_t &pos);
+
 	// 文字列のバイト位置 pos から次の文字の開始位置とコードポイントを取得
 	// 戻り値: 成功したら true、不正なシーケンスなら false
 	bool get_next_char(const std::string &s, size_t &pos, int &code_point);

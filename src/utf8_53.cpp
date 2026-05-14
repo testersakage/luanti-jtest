@@ -6,6 +6,49 @@
 
 namespace utf8_53 {
 
+// ─── 【消失前再現】JSONから流し込まれた地域差リストの「動的実体ベクター」 ───
+std::vector<WidthRange> g_half_width_ranges;
+
+// ─── 【消失前再現】独立させた判定ルーチンのみの関数（UAX #11 準拠） ───
+float get_char_width_ratio(uint32_t codepoint)
+{
+	// A. 絶対半角領域（ASCII 0x20〜0x7E & 半角カナ 0xFF61〜0xFF9F）の固定ジャッジ
+	if ((codepoint >= 0x0020 && codepoint <= 0x007E) ||
+		(codepoint >= 0xFF61 && codepoint <= 0xFF9F)) {
+		return 0.5f;
+	}
+
+	// B. 【魔導書連動】JSONで動的に更新された地域差（キリル・ギリシャ等）の範囲スキャン
+	for (const auto &range : g_half_width_ranges) {
+		if (codepoint >= range.start && codepoint <= range.end) {
+			return 0.5f; // 指定範囲にヒットしたら半角（0.5倍）を返す
+		}
+	}
+
+	return 1.0f; // どれにも当てはまらなければ等倍（全角ベース）
+}
+
+// ─── 【消失前再現】文字パースと幅情報をセットで返す最上流窓口 ───
+GlyphInfo get_next_glyph_info(const std::string &utf8_text, size_t &pos)
+{
+	GlyphInfo glyph;
+	int cp = 0;
+
+	// 既存のパース関数を叩いてコードポイントを取得
+	if (get_next_char(utf8_text, pos, cp)) {
+		glyph.codepoint = static_cast<uint32_t>(cp);
+		// 独立させた判定ルーチンを呼び出して幅の比率をセット
+		glyph.width_ratio = get_char_width_ratio(glyph.codepoint);
+	} else {
+		// パース失敗時の安全ガード
+		glyph.codepoint = 0;
+		glyph.width_ratio = 1.0f;
+		if (pos < utf8_text.length()) pos++; // 無限ループ防止
+	}
+
+	return glyph;
+}
+
 //  次のUTF-8文字を解析するコアロジック
 bool get_next_char(const std::string &s, size_t &pos, int &code_point) {
 	if (pos >= s.length()) return false;
@@ -33,9 +76,9 @@ bool get_next_char(const std::string &s, size_t &pos, int &code_point) {
 
 	// 後続バイトのチェック (0x80-0xBF)
 	for (size_t k = 1; k < len; ++k) {
-	unsigned char next_c = (unsigned char)s[pos + k];
-	if ((next_c & 0xC0) != 0x80) return false;
-	code_point = (code_point << 6) | (next_c & 0x3F);
+		unsigned char next_c = (unsigned char)s[pos + k];
+		if ((next_c & 0xC0) != 0x80) return false;
+		code_point = (code_point << 6) | (next_c & 0x3F);
 	}
 
 	pos += len; // 次の文字の開始位置へ進める
@@ -78,12 +121,8 @@ void push_char(std::string &res, int cp) {
 }
 
 // Unicode EAW (East Asian Width) 
-
 int get_char_width(int cp) {
-	//  ASCII範囲 (0x00 - 0x7F) と 0xFF までの半角範囲は 1列(6px相当)
-	//  ラテン文字なども 1列
 	if (cp < 0x1100) return 1;
-	// 2. 半角カタカナ範囲 (U+FF61 - U+FF9F) を「幅1」に指定
 	if (cp >= 0xFF61 && cp <= 0xFF9F) return 1;
 
 	//  CJK全角文字の主要範囲
@@ -108,8 +147,8 @@ int get_char_width(int cp) {
 		(cp >= 0x1F300 && cp <= 0x1F9FF) || // 絵文字
 		(cp >= 0x20000 && cp <= 0x3FFFF))   // 漢字拡張B〜F・超多倍文字
 	{
-	return 2;
-}
+		return 2;
+	}
 
 	// デフォルトは 1列
 	return 1;
@@ -125,31 +164,37 @@ int get_string_width(const std::string &s) {
 	return total_width;
 }
 
-	// 以下、逆変換関数
-
 //  push_char の逆：文字列をコードポイントの配列(vector)に分解する
 std::vector<int> to_codepoints(const std::string &s) {
 	std::vector<int> res;
 	size_t pos = 0;
 	int cp;
-	// 既存の get_next_char を活用
 	while (get_next_char(s, pos, cp)) {
 		res.push_back(cp);
 	}
 	return res;
 }
 
-	// --- 統合：utf8wrap の実体となる 4つの関数 ---
+// --- 統合：utf8wrap の実体となる 4つの関数 ---
 
 // w21. 文字列の物理表示幅(pixel)を計算
 unsigned int get_text_width(const std::string &text, int han_w, int zen_w) {
 	if (text.empty()) return 0;
 	unsigned int total_w = 0;
 	size_t pos = 0;
-	int cp;
-	while (get_next_char(text, pos, cp)) {
+	
+	// 【消失前再現】動的判定（get_char_width_ratio）が 0.5 を返したら、強制的に han_w を適用
+	while (pos < text.length()) {
+		int cp;
+		if (!get_next_char(text, pos, cp)) break;
 		if (cp == '\n' || cp == '\r') continue;
-		total_w += (get_char_width(cp) == 2 ? zen_w : han_w);
+
+		float ratio = get_char_width_ratio(static_cast<uint32_t>(cp));
+		if (ratio == 0.5f) {
+			total_w += han_w;
+		} else {
+			total_w += (get_char_width(cp) == 2 ? zen_w : han_w);
+		}
 	}
 	return total_w;
 }
@@ -159,13 +204,17 @@ std::string truncate_text(const std::string &text, unsigned int max_px, int han_
 	std::string result = "";
 	int current_px = 0;
 	size_t pos = 0;
-	int cp;
+	
+	// 【消失前再現】動的例外範囲と完全同期
 	while (pos < text.length()) {
 		size_t last_pos = pos;
+		int cp;
 		if (!get_next_char(text, pos, cp)) break;
 		if (cp == '\n' || cp == '\r') break;
 
-		int char_w = (get_char_width(cp) == 2 ? zen_w : han_w);
+		float ratio = get_char_width_ratio(static_cast<uint32_t>(cp));
+		int char_w = (ratio == 0.5f) ? han_w : (get_char_width(cp) == 2 ? zen_w : han_w);
+		
 		if (current_px + char_w > (int)max_px) break;
 
 		result.append(text.substr(last_pos, pos - last_pos));
@@ -220,209 +269,4 @@ std::vector<std::string> generate_lines(const std::string &text, unsigned int ma
 	return final_lines;
 }
 
-
-/*
-	// 以下、ラッパー関数
-
-//  看板の物理幅（ピクセル）を計算する
-// 初期値（引数なしの場合） 半角=6px / 全角=12px
-int get_total_pixel_width(const std::string &s, int han_w, int zen_w) {
-	int total_px = 0;
-	size_t pos = 0;
-	int cp;
-	while (get_next_char(s, pos, cp)) {
-		// get_char_width(cp) が 1なら半角、2なら全角
-		total_px += (get_char_width(cp) == 2 ? zen_w : han_w);
-	}
-	return total_px;
-}
-
-//  指定したピクセル幅に収まるように安全にカットする
-std::string truncate_to_pixel_width(const std::string &s, int max_px, int han_w, int zen_w) {
-    std::string res = "";
-    int current_px = 0;
-    size_t pos = 0;
-    int cp;
-
-    while (pos < s.length()) {
-        size_t last_pos = pos;
-        if (!get_next_char(s, pos, cp)) break;
-
-        // 改行コードで停止
-        if (cp == '\n' || cp == '\r') {
-            break; 
-        }
-
-        // ASCII(0x7F以下) と 半角カナ(FF61-FF9F) 以外はすべて 全角
-        int w = zen_w;
-        if (cp <= 0x7F || (cp >= 0xFF61 && cp <= 0xFF9F)) {
-            w = han_w;
-        }
-
-        if (current_px + w > max_px) break;
-
-        res.append(s.substr(last_pos, pos - last_pos));
-        current_px += w;
-    }
-    return res;
-}
-	
-//  文字列を指定範囲で切り出す＋自動改行
-std::vector<std::string> get_lines(const std::string &s, int max_px, int han_w, int zen_w) {
-    std::vector<std::string> lines;
-    std::string remaining = s;
-
-    while (!remaining.empty()) {
-        // 1. まず現在の幅(max_px)に収まる「物理的な限界」を測る
-        std::string line = truncate_to_pixel_width(remaining, max_px, han_w, zen_w);
-        size_t consume_len = line.length();
-
-        // --- ハイブリッド・ラップ処理 ---
-        // もし物理限界が文字列の途中であり、かつその直後にスペースや改行がない場合
-        if (consume_len < remaining.length()) {
-            char next_char = remaining[consume_len];
-            if (next_char != ' ' && next_char != '\n' && next_char != '\r') {
-                // 単語の途中かもしれないので、直前のスペースを探す
-                size_t last_space = line.find_last_of(" ");
-                
-                // スペースが見つかり、かつそれが極端に手前でない場合のみ、そこで改行する
-                // (あまりに手前すぎると空白が目立つので、その場合は文字単位で切る「ハイブリッド」判断)
-                if (last_space != std::string::npos && last_space > (line.length() * 0.6)) {
-                    line = line.substr(0, last_space);
-                    consume_len = last_space + 1; // スペースそのものは消費して消す
-                }
-            }
-        }
-
-        // --- 改行コードの処理 (既存ロジック) ---
-        if (consume_len < remaining.length()) {
-            if (remaining[consume_len] == '\n') {
-                consume_len += 1;
-            } else if (remaining[consume_len] == '\r') {
-                consume_len += 1;
-                if (consume_len < remaining.length() && remaining[consume_len] == '\n') {
-                    consume_len += 1;
-                }
-            }
-        }
-
-        // 1文字も入らない場合の救済（巨大な全角文字など）
-        if (line.empty() && !remaining.empty()) {
-            size_t pos = 0;
-            int cp;
-            if (get_next_char(remaining, pos, cp)) {
-                line = remaining.substr(0, pos);
-                consume_len = pos;
-            } else {
-                break;
-            }
-        }
-
-        lines.push_back(line);
-        remaining = (consume_len < remaining.length()) ? remaining.substr(consume_len) : "";
-    }
-    return lines;
-}
-
-// utf8_fontengine.cpp からの移設
-unsigned int get_text_width(const std::string &text, int han_w, int zen_w) {
-	if (text.empty())
-		return 0;
-
-	unsigned int total_w = 0;
-	size_t pos = 0;
-	int cp;
-
-	// UTF-8を1文字ずつデコードしながら長さを測る
-	while (get_next_char(text, pos, cp)) {
-		// 改行コードは幅計算に含めない
-		if (cp == '\n' || cp == '\r')
-			continue;
-
-		// 全角(2)なら zen_w、半角(1)なら han_w を足す
-		total_w += (get_char_width(cp) == 2 ? zen_w : han_w);
-	}
-
-	return total_w;
-}
-
-// utf8_fontengine.cpp からの移設
-std::vector<std::string> wrap_text(const std::string &text, unsigned int max_px, int han_w, int zen_w)
-{
-	std::vector<std::string> lines;
-	if (text.empty())
-		return lines;
-
-	std::string current_line = "";
-	size_t pos = 0;
-	int cp;
-
-	while (get_next_char(text, pos, cp)) {
-		std::string next_char;
-		push_char(next_char, cp);
-
-		// 移設のポイント：自前の get_text_width に物差しを添えて呼び出す
-		if (get_text_width(current_line + next_char, han_w, zen_w) > max_px) {
-			lines.push_back(current_line);
-			current_line = next_char;
-		} else {
-			current_line += next_char;
-		}
-	}
-
-	if (!current_line.empty())
-		lines.push_back(current_line);
-
-	return lines;
-}
-
-// utf8_fontengine.cpp からの移設
-std::string truncate_text(const std::string &text, unsigned int max_px, int han_w, int zen_w)
-{
-	std::string result = "";
-	size_t pos = 0;
-	int cp;
-
-	while (get_next_char(text, pos, cp)) {
-		std::string next_char;
-		push_char(next_char, cp);
-
-		// ★ ポイント：移設した get_text_width に物差しを渡して計測
-		if (get_text_width(result + next_char, han_w, zen_w) > max_px)
-			break;
-
-		result += next_char;
-	}
-
-	return result;
-}
-
-// utf8_fontengine.cpp からの移設
-std::vector<std::string> generate_lines(const std::string &text, unsigned int max_px, int han_w, int zen_w)
-{
-	std::vector<std::string> final_lines;
-	// std::stringstream は <sstream> のインクルードが必要です
-	std::stringstream ss(text);
-	std::string segment;
-
-	// 1. まずは手動改行(\n)で分割
-	while (std::getline(ss, segment, '\n')) {
-		// 2. 分割された各セグメントに、万能物差し版 wrap_text を適用
-		std::vector<std::string> wrapped = wrap_text(segment, max_px, han_w, zen_w);
-		
-		if (wrapped.empty()) {
-			final_lines.push_back("");
-		} else {
-			final_lines.insert(final_lines.end(), wrapped.begin(), wrapped.end());
-		}
-	}
-	
-	// 3. 末尾の改行ケア
-	if (!text.empty() && text.back() == '\n') {
-		final_lines.push_back("");
-	}
-
-	return final_lines;
-}
-*/
 } // namespace utf8_53

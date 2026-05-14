@@ -2,26 +2,48 @@
 local S = minetest.get_translator("mod_utf8signex_sample")
 local modpath = minetest.get_modpath(minetest.get_current_modname())
 
--- --- 1. 魔導書 (Atlasの切り出しルール) の召喚 ---
 if minetest.utf8sign and minetest.utf8sign.ex.load_atlas_config then
 	minetest.utf8sign.ex.load_atlas_config(modpath .. "/signs_lib.json")
-	print("ACTION [Lua]: init.lua: load atlas config file")
 end
-local prof = minetest.utf8sign.ex.get_atlas_status("signs_lib")
+
+-- --- 1. 新設 get_config() による最新ステータスの召喚 ---
+local prof = nil
+if minetest.utf8sign and minetest.utf8sign.get_config then
+	-- C++からリファクタリング済みの最新Configテーブルを取得
+	local full_config = minetest.utf8sign.get_config()
+	prof = full_config and full_config.ex
+end
+
 if prof then
-    print("--- Atlas Profile Status ---")
-    print("Active ID:  " .. (prof.active_id or "nil"))
-    print("Path:       " .. (prof.path or "nil"))
-    print("File Pattern: " .. (prof.file_pattern or "nil"))
-    print("Grid Columns: " .. (prof.grid_columns or "0"))
-    print("Grid Size:" .. (prof.grid_size or "0"))
-    print("Glyph Width:" .. (prof.glyph_w or "0"))
-    print("Glyph Height:" .. (prof.glyph_h or "0"))
-    print("Alpha Reverse:" .. tostring(prof.alpha_reverse))
-    print("----------------------------")
+	print("--- Atlas Profile Status ---")
+	-- C++側（l_get_config）から返ってくる最新のキー名（ex_***）でマッピング
+	print("Active ID:    " .. (prof.id or "none"))
+	print("Path:         " .. (prof.ex_sub_path or "nil")) -- 必要に応じて報告
+	print("File Pattern: " .. (prof.ex_file_pattern or "nil"))
+	print("Grid Columns: " .. (prof.ex_grid_columns or "0"))
+	print("Grid Size:    " .. (prof.ex_grid_size or "0"))
+	print("Glyph Width:  " .. (prof.ex_char_w_zen or "0"))   -- glyph_w の代わりにこれを表示
+	print("Glyph Height: " .. (prof.ex_line_height or "0"))  -- glyph_h の代わりにこれを表示
+	print("Alpha Reverse:" .. tostring(prof.ex_alpha_reverse))
+
+	-- 【新設】JSONからロードされた半角例外ルールの件数もひと目で確認可能に！
+	local ranges = prof.half_width_ranges or {}
+	print("UAX #11 Rules:" .. #ranges .. " ranges loaded")
+	
+	for _, range in ipairs(ranges) do
+		local start_hex = string.format("0x%04X", range.start)
+		local end_hex   = string.format("0x%04X", range["end"])
+		
+		-- 【大勝利】C++経由で届いた JSON 生の _memo（"キリル文字"など）をそのまま指名！
+		local memo_text = range.memo or "その他の領域"
+		
+		print("  " .. start_hex .. " - " .. end_hex .. " : " .. memo_text)
+	end
+	print("----------------------------")
 else
-    print("Error: Profile not found!")
+	print("Error: Profile not found!")
 end
+
 -- --- 2. C++エンジンへの詳細設定 (Config転送) ---
 if minetest.utf8sign and minetest.utf8sign.set_config then
 	minetest.utf8sign.set_config({
