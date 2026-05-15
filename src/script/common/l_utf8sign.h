@@ -35,6 +35,7 @@
 
 
 #if UTF8_ATLAS
+/*
 // アトラス
 struct UTF8STDAtlas {
 	u32 st_sign_width = 115;
@@ -51,6 +52,27 @@ struct UTF8STDAtlas {
 	// Cache Setting
 	u32 page_cache = 4;
 	std::string st_atlas_path = ""; // atlasの場所
+};
+*/
+// アトラス（標準フォントテクスチャ方式）
+struct UTF8STDAtlas {
+	u32 st_sign_width = 115;
+	u32 st_char_w_han = 6;     // 半角幅の基準 
+	u32 st_char_w_zen = 12;    // 全角幅の基準
+	u32 st_line_height = 14;   // 行間
+	u32 st_padding_x = 0;
+	u32 st_padding_y = 0;
+	u32 st_max_lines = 4;
+
+	// ─── 【あなたの設計】JSONの代わりにLuaから受け取る諸元格納場所 ───
+	std::string st_atlas_path = "";  // atlasの場所 (例: unicode_page_%02x.png)
+	u32 st_grid_columns = 16;        // atlas画像の文字数（横）
+	u32 st_grid_size = 16;           // 16pxなどの器
+	bool st_alpha_reverse = true;    // alpha反転フラグ
+	bool uax_half_switch = true;     // UAX #11 半角自動仕分けスイッチ
+
+	// Cache Setting
+	u32 st_page_cache = 4;
 };
 #endif
 
@@ -153,7 +175,7 @@ public:
 	static UTF8SignManager* getInstance();
 
 #if UTF8_ATLAS
-    UTF8STDAtlas st_atlas;
+    UTF8STDAtlas st;
 #endif
 
 #if UTF8_SDL2_ATLAS

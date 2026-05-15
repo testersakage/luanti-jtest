@@ -50,7 +50,8 @@ public:
 	static ImageRGBA getGlyphImageEX(int codepoint);
 
 	// Lua API
-	//static u32 getPageCache();
+	static u32 getCharCacheEx();
+	static u32 getPageCacheEx();
 #endif
 
 private:

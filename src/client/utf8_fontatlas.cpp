@@ -100,35 +100,29 @@ std::map<int, ImageRGBA> UTF8FontAtlas::m_st_pages;
 std::list<int> UTF8FontAtlas::m_st_page_order;
 size_t UTF8FontAtlas::m_st_max_pages = 4;
 
+// st Atlas API Cache count
+u32 UTF8FontAtlas::getPageCache() {
+    return (u32)m_st_pages.size();
+}
+
 // STD Atlas 用
 const ImageRGBA &UTF8FontAtlas::loadPage(int page)
 {
+	auto &st_cfg = UTF8SignManager::getInstance()->st;
+
 	//  Cache（map）を確認
 	auto it = m_st_pages.find(page);
 	if (it != m_st_pages.end()) return it->second;
 
 	//  Cacheの掃除（FIFO）: 5枚目が必要になったら、一番古い1枚を捨てる
-	while (m_st_pages.size() >= m_st_max_pages && !m_st_page_order.empty()) {
+	while (m_st_pages.size() >= st_cfg.st_page_cache && !m_st_page_order.empty()) {
 		int oldest = m_st_page_order.front();
 		m_st_page_order.pop_front();
 		m_st_pages.erase(oldest); 
 		infostream << "UTF8FontAtlas: FIFO Evicted old page: " << oldest << std::endl;
 	}
-/*
-	//  パス生成（将来のポータビリティを考慮して整理）
-	char filename[512];
-	// ※ここはあなたの環境に合わせて、あるいは後でポータブルなパス取得に置き換え
-	snprintf(filename, sizeof(filename), 
-//		"C:/msys64/home/localuser/luanti/games/mineclonia-jtest/mods/ITEMS/mcl_signs/textures/unicode_page_%02x.png", 
-		"C:/msys64/home/localuser/luanti/mods/mod_utf8sign_sample/textures/unicode_page_%02x.png", 
-//		"unicode_page_%02x.png", 
-		page);
-
-	infostream << "UTF8FontAtlas: Loading new ST-page: " << filename << " (Total: " << m_st_pages.size() + 1 << ")" << std::endl;
-*/
 
 	// マネージャーからパスを拝借
-	auto &st_cfg = UTF8SignManager::getInstance()->st_atlas;
 	std::string base_path = st_cfg.st_atlas_path;
 
 	char filename[512];
@@ -139,6 +133,15 @@ const ImageRGBA &UTF8FontAtlas::loadPage(int page)
 
 	//  ロードと格納（std::move で所有権をスマートに移譲）
 	ImageRGBA img = load_png_rgba(filename);
+
+	// ─── 【本題】Unifont用のアルファ反転フラグが ON なら、ページ丸ごと一括反転！ ───
+	if (st_cfg.st_alpha_reverse && !img.data.empty()) {
+		for (size_t i = 0; i < img.data.size(); i += 4) {
+			img.data[i + 3] = 255 - img.data[i + 3]; // アルファチャンネルを反転（白黒反転）
+		}
+		infostream << "UTF8FontAtlas: Alpha reverse applied to ST page: " << page << std::endl;
+	}
+
 	m_st_pages[page] = std::move(img);
 	m_st_page_order.push_back(page);
 
@@ -146,6 +149,7 @@ const ImageRGBA &UTF8FontAtlas::loadPage(int page)
 }
 
 /* --- 4. メインの切り出し関数 --- */
+/*
 ImageRGBA UTF8FontAtlas::getGlyphImage(int codepoint)
 {
     if (codepoint < 0) throw std::runtime_error("Invalid CP");
@@ -185,10 +189,63 @@ ImageRGBA UTF8FontAtlas::getGlyphImage(int codepoint)
     // 5. 切り出し実行 (高さは画像の実態に合わせる)
     return crop_glyph_custom(atlas, gx, gy, current_w, actual_line_h);
 }
+*/
+// // src/client/utf8_fontatlas.cpp
+ImageRGBA UTF8FontAtlas::getGlyphImage(int codepoint)
+{
+	if (codepoint < 0) throw std::runtime_error("Invalid CP");
 
-// st Atlas API Cache count
-u32 UTF8FontAtlas::getPageCache() {
-    return (u32)m_st_pages.size();
+	// 【ログ】制御文字などの低位コードポイント報告
+	if (codepoint < 32) {
+		infostream << "UTF8FontAtlas: Low codepoint (possible ghost): 0x" 
+		           << std::hex << codepoint << std::dec << std::endl;
+	}
+
+	int page = codepoint / 256;
+	int index = codepoint % 256;
+
+	// 1. ページのロード (loadPage内で st_alpha_reverse による反転は一括処理済)
+	const ImageRGBA &atlas = loadPage(page);
+
+	// 2. 共通マネージャーから現在のST看板用Config（指示書）を取得
+	UTF8STDAtlas &cfg = UTF8SignManager::getInstance()->st;
+
+	// ─── 【EXエンジン互換】画像の全幅と列数から「1部屋の幅・高さ」を全自動判別！ ───
+	// これにより、12pxフォント画像でも16pxのUnifontでも、座標のズレが物理的に100%排除されます
+	u32 cell_w = atlas.width / cfg.st_grid_columns;
+	u32 step_h = (cfg.st_grid_size > 0) ? cfg.st_grid_size : (atlas.height / 8);
+
+	// 3. ─── 切り出し幅(current_w)の動的ジャッジ（UAX #11） ───
+	u32 current_w = cell_w; // 基本は「部屋の幅いっぱい（全角）」
+
+	bool is_half = false;
+	if (cfg.uax_half_switch) {
+		// A. スイッチがONなら、大元インフラ（utf8_53）の動的仕分けベクターをスキャン
+		float ratio = utf8_53::get_char_width_ratio(static_cast<uint32_t>(codepoint));
+		if (ratio == 0.5f) {
+			is_half = true;
+		}
+	} else {
+		// B. スイッチがOFFの場合の、ASCII と 半角カナ 固定セーフティガード
+		if (page == 0x00 && index <= 0x7F) {
+			is_half = true;
+		} else if (page == 0xFF && (index >= 0x61 && index <= 0x9F)) {
+			is_half = true;
+		}
+	}
+
+	// 半角判定なら、部屋の幅の「半分」を切り出し幅として採用！
+	if (is_half) {
+		current_w = cell_w / 2;
+	}
+
+	// 4. ─── ⭕ 座標計算 ───
+	// 常に「cell_w / step_h (自動計算された実寸の歩幅)」を基準に切り出し位置を特定！
+	int gx = (index % cfg.st_grid_columns) * cell_w;
+	int gy = (index / cfg.st_grid_columns) * step_h;
+
+	// 5. 完璧にクリップされた幅で余白を遮断して切り出し実行！
+	return crop_glyph_custom(atlas, gx, gy, current_w, step_h);
 }
 #endif
 
@@ -235,6 +292,15 @@ std::map<int, ImageRGBA> UTF8FontAtlas::m_char_cache; // 文字画像
 std::map<int, ImageRGBA> UTF8FontAtlas::m_page_cache; // ページ画像
 std::list<int> UTF8FontAtlas::m_ex_page_order;        // 登録順（FIFO用）
 size_t UTF8FontAtlas::m_ex_max_pages = 4;           // minetest.confから読み込む上限
+
+// ex Atlas API Cache count
+u32 UTF8FontAtlas::getCharCacheEx() {
+    return (u32)m_char_cache.size();
+}
+
+u32 UTF8FontAtlas::getPageCacheEx() {
+    return (u32)m_page_cache.size();
+}
 
 // EX Atlas 用
 const ImageRGBA &UTF8FontAtlas::loadPageEX(int page)

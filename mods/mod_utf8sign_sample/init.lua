@@ -5,12 +5,30 @@ local modpath = minetest.get_modpath(minetest.get_current_modname())
 -- --- 1. C++エンジンへの物差し通知 ---
 if minetest.utf8sign then
 	minetest.utf8sign.set_config({
-		st_atlas = {
+		st = {
+--[[
+-- for PixelMplus 12px
 			st_line_height = 14,
 			st_max_lines = 4,
 			st_char_w_han = 6,
 			st_char_w_zen = 12,
-			st_atlas_path = modpath .. "/textures/unicode_page_%02x.png",
+			st_atlas_path = modpath .. "/textures/pixelmplus_12/unicode_page_%02x.png",
+			st_grid_columns = 32,
+			st_grid_size = 14,
+			st_alpha_reverse = false,
+			uax_half_switch = false
+]]
+-- for signs_lib Unifont
+			st_char_w_han = 8,
+			st_char_w_zen = 16,
+			st_line_height = 16,
+			st_max_lines = 4,
+			st_atlas_path = modpath .. "/textures/signs_lib_uni%02x.png",
+			st_grid_columns = 16,
+			st_grid_size = 16,
+			st_alpha_reverse = true,
+			uax_half_switch = true
+
 		}
 	})
 end
@@ -47,7 +65,8 @@ local function update_sign_visual(pos, text)
 	local tex = "utf8_blank.png"
 	if text ~= "" then
 		-- 115x82キャンバス、左余白15、上余白14、黒色
-		tex = "[utf8combine:" .. ST_SIGN_WIDTH .. "x82:15,14@000000=" .. text .. "]"
+--		tex = "[utf8combine:" .. ST_SIGN_WIDTH .. "x82:15,14@000000=" .. text .. "]"
+		tex = "[utf8combine:" .. ST_SIGN_WIDTH .. "x82:4,4@000000=" .. text .. "]"
 		print("DEBUG_LUA_TEX: " .. tex) -- これをターミナルに表示させる
 	end
 

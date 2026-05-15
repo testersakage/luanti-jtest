@@ -232,7 +232,7 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 	dest_img->fill(video::SColor(0, 0, 0, 0));
 
 	// ---  共通マネージャーから最新設定を取得 ---
-	UTF8STDAtlas &cfg = UTF8SignManager::getInstance()->st_atlas;
+	UTF8STDAtlas &cfg = UTF8SignManager::getInstance()->st;
 
 	// ---  【大掃除の成果】パースを万能窓口に丸投げ！ ---
 	RenderTask task = parseUtf8Spec(command);
@@ -263,7 +263,7 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 
 		u32 x_cursor = start_x;
 		std::vector<int> cps = utf8_53::to_codepoints(line_str);
-
+/*
 		for (int cp : cps) {
 			u32 current_w = 12; 
 			try {
@@ -290,7 +290,50 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 			x_cursor += current_w; 
 			if (x_cursor >= canvas_w) break; 
 		}
-		
+*/
+		for (int cp : cps) {
+			u32 current_w = cfg.st_char_w_zen; // デフォルトは全角幅
+			try {
+				ImageRGBA glyph = m_atlas_cache->getGlyphImage(cp);
+				if (x_cursor + glyph.width > canvas_w) break;
+
+				// ─── 【本題】このST看板のスイッチがONなら、全半角比率を取得 ───
+				bool is_half = false;
+				if (cfg.uax_half_switch) {
+					float ratio = utf8_53::get_char_width_ratio(static_cast<uint32_t>(cp));
+					if (ratio == 0.5f) {
+						is_half = true;
+					}
+				} else {
+					// スイッチがOFFの場合でも、ASCIIと半角カナは固定で半角扱い（安全ガード）
+					is_half = (cp >= 0x0020 && cp <= 0x007E) || (cp >= 0xFF61 && cp <= 0xFF9F);
+				}
+
+				// 判定された正しい歩幅を適用（半角なら st_char_w_han、全角なら st_char_w_zen）
+				u32 advance = is_half ? cfg.st_char_w_han : cfg.st_char_w_zen;
+				current_w = advance; // 次の文字への歩幅をこの値で確定させる！
+
+				for (int gy = 0; gy < (int)glyph.height; gy++) {
+					//  【重要】xループの上限を glyph.width ではなく、
+					// 判定された正しい歩幅（advance: 6px または 12px）にクリップする！
+					// これにより、STアトラスの右半分にある余白ドットのスタンプを物理的に遮断します。
+					for (int gx = 0; gx < (int)advance; gx++) {
+						if (gx >= (int)glyph.width) break;
+						int i = (gy * glyph.width + gx) * 4;
+
+						video::SColor pixel_color = target_color;
+						pixel_color.setAlpha(glyph.data[i + 3]); 
+
+						if (pixel_color.getAlpha() > 0) {
+							dest_img->setPixel(x_cursor + gx, y_cursor + gy, pixel_color);
+						}
+					}
+				}
+			} catch (...) {}
+			
+			x_cursor += current_w; // 正しい歩幅（6px または 12px）だけカーソルを右に進める
+			if (x_cursor >= canvas_w) break; 
+		}
 		// 行送りを cfg.line_height (14px) に変更
 		y_cursor += cfg.st_line_height; 
 	}
@@ -373,9 +416,6 @@ bool UTF8FontEngine::extractAtlasGlyph(u32 code, FTCachedGlyph &out_glyph)
 }
 */
 
-// Atlas EX Cahe制御用 静的変数
-//std::map<u64, EXCachedChar> UTF8FontEngine::m_char_cache;
-//std::map<u64, EXCachedPage> UTF8FontEngine::m_page_cache;
 
 void UTF8FontEngine::renderutf8combineex(void *dest_img_ptr, const std::string &command)
 {
@@ -405,42 +445,7 @@ void UTF8FontEngine::renderutf8combineex(void *dest_img_ptr, const std::string &
 	for (const std::string &line_str : lines) {
 		std::vector<int> codes = utf8_53::to_codepoints(line_str);
 		u32 cursor_x = start_x;
-/*
-		for (u32 code : codes) {
-			//  二段構えキャッシュ完結型の画像取得
-			ImageRGBA glyph = UTF8FontAtlas::getGlyphImageEX(code);
 
-			if (!glyph.data.empty()) {
-				// 半角・全角の歩幅判定
-				bool is_half = (code <= 0x00FF) || (code >= 0xFF61 && code <= 0xFF9F);
-				u32 advance = is_half ? cfg.ex_char_w_han : cfg.ex_char_w_zen;
-
-				// --- ピクセル転写（ダイレクトスタンプ） ---
-				for (int y = 0; y < glyph.height; y++) {
-					u32 dy = cursor_y + y;
-					if (dy >= dest_img->getDimension().Height) break;
-
-					for (int x = 0; x < (int)advance; x++) {
-						if (x >= glyph.width) break;
-						u32 dx = cursor_x + x;
-						if (dx >= dest_img->getDimension().Width) break;
-
-						// Atlas（モノクロPNG）の Alpha を拾って色を乗せる
-						int src_idx = (y * glyph.width + x) * 4;
-						u8 alpha = glyph.data[src_idx + 3];
-
-						if (alpha > 0) {
-							video::SColor color = task.color;
-							color.setAlpha(alpha);
-							dest_img->setPixel(dx, dy, color);
-//							dest_img->setPixel(dx, dy, video::SColor(255, 255, 0, 0));
-						}
-					}
-				}
-				cursor_x += advance;
-			}
-		}
-*/
 		for (u32 code : codes) {
 			// 二段構えキャッシュ完結型の画像取得
 			ImageRGBA glyph = UTF8FontAtlas::getGlyphImageEX(code);
