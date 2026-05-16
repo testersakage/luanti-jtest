@@ -1,35 +1,46 @@
 ------------------------------
-## Luanti Unicode Modernization Project (V4 Engine "EX")
+## Luanti Unicode Modernization Project
 
 [English Documentation (README_en.md)](./README_en.md)
 
-このリポジトリは、Luanti のテキスト描画システムを Unicode（特に日本語および多言語）に完全対応させ、Minecraft と同等、あるいはそれ以上の描画品質を実現するためのフォークです。
-従来の Lua による低速な画像合成を完全に廃止。C++ エンジン側に直接「Unicode Glyph API」を実装し、さらに SDL2 / SDL_image を統合した 「EX Atlas エンジン」 により、あらゆるフォント規格を動的に飲み込む柔軟性と圧倒的なパフォーマンスを両立しました。
+このリポジトリは、Luanti のテキスト描画システムを Unicode（特に日本語および多言語）に完全対応させ、Minecraft と同等の描画品質を目指したフォークです。
+従来の Lua による文字画像の合成を廃止。Luaからは初期設定と文字列またはcodepointを「Unicode Glyph API」を通してC++ エンジン側に送信するだけで画像合成が完了します。さらに SDL2 / SDL_image にも対応したレンダリングエンジンにより、あらゆるフォント規格を動的に読み込む柔軟性と圧倒的なパフォーマンスを両立しました。
 
 <img width=600, height=225, src="https://github.com/testersakage/luanti-jtest/blob/master/screenshots/samplesign.png"></img>
 ## 🔧 このフォークの革新的な機能
 
-## 1. 動的定義エンジン "DDE" (Dynamic Definition Engine) [NEW]
+### 0. ネティブ C++ UTF-8 Glyph API インフラ
+* 従来の Lua レイヤーによるテキストパースや文字幅計算（`utf8` ループ）を廃止。C++ エンジンの最深部に直接ネイティブな Unicode 解析基盤を構築しました。
 
-* 規格からの解放: 12pxや14pxといった固定規格を廃止。外部JSONファイル（設計図）を読み込むことで、16x16や12x14など、あらゆるグリッドサイズのアトラスに即座に対応します。
-* プロファイル切り替え: Mod側からJSONを指定するだけで、リビルドなしで看板のフォントセットを動的に切り替え可能です。
+### 1. マルチバイト対応 C++ フォントアトラス・インフラ 
+* 従来の Lua 側での処理を廃止。数万文字におよぶ日本語・CJK（日中韓）の膨大なフォントデータを C++ のネイティブメモリ空間で超高速に捌く、独自のフォントアトラス（Font Atlas）スライサーとキャッシュシステムを実装しました。
 
-## 2. SDL2 / SDL_image による高精細レンダリング [NEW]
+### 2. 超高速画像合成コア「[utf8combine]」専用レンダラー
+* 文字列コマンドからダイレクトに1枚の透過看板テクスチャを爆速で合成・生成する、独自の **`[utf8combine]` (および `[utf8combineex]`,`[utf8combineft]`) 専用レンダラー** を新設しました。
 
-* マルチフォーマット対応: SDL_imageの導入により、PNG/JPG等の様々な画像形式をサポート。
-* 透過錬金術 (Alpha Reverse): 背景が黒塗りの古いアセットでも、エンジン側でアルファチャンネルを反転・生成し、最新の透過看板として蘇らせます。
-* ピクセルパーフェクト: 画像の実サイズから1ピクセルあたりの歩幅を逆算する cell_w ロジックを搭載。1pxの狂いもない完璧な文字間隔を実現しました。
+### 3. SDL2 / SDL_image / SDL_ttf グラフィックインフラの統合 
+* Luanti 標準の描画エンジン（Irrlicht）の制約を打ち破るため、世界標準のグラフィックライブラリである **SDL2、SDL_image、SDL_ttf** をシステム内部へ統合しました。(Standardを除く)
 
-## 3. C++/Lua 同期インフラ (SignManager)
+### 4. カプセル化対応型・C++/Lua双方向同期インフラ「UTF8SignManager」
+* 内蔵された強力な SDL2 グラフィックインフラと大元レイアウト物差しを中央制御するため、単一の強固な管理中枢である **`UTF8SignManager`** を実装しました。
 
-* 共通の物差し: minetest.utf8sign API を通じて、サーバー（Lua）とクライアント（C++）が全く同じ文字幅データを共有。オンライン環境での表示ズレを根絶しました。
-* 高度なレイアウト解析: 東アジア文字幅（EAW）に対応し、半角を1、全角を2として正確に判定。プロフェッショナルなワードラップを提供します。
+### 5. 動的定義エンジン「DDE (Dynamic Definition Engine)」 (EX Atlasのみ)
+* 従来のフォントアトラス描画における「C++側へのサイズや規格のハードコード」を完全に撤廃。外部JSONファイル（設計図）やLua側のパラメータテーブルを読み込むことで、12px、14px、16pxなど、この世に存在するあらゆるグリッドサイズや画像命名規則のアトラスへ、リビルドなしで即座にアジャスト・完全駆動する **「動的定義エンジン (DDE)」** を確立しました。
 
-## 4. マルチエンジン・ハイブリッド構成 [UPDATED]
+## マルチエンジン・ハイブリッド構成
+システム構成に応じて3つのエンジンを用意しました。
 
-* 旧Atlas (Standard) の洗練: 前回リリースしたIrrlicht（Luanti標準）ベースのエンジンも継続サポート。V4の知恵をフィードバックし、12px/14px判定の安定性をさらに向上させました。
-* FreeType (FT) エンジンの内蔵: アトラス画像すら不要とする、SDL2_ttf / FreeType によるダイレクトレンダリング機能も搭載。TrueTypeフォント（TTF/OTF）をそのまま看板に映し出す究極の柔軟性を提供します。
-* コンパイルオプション制御: 各エンジンはビルド時のフラグ（#ifdef）で個別に有効化可能。環境や用途に合わせた最適なバイナリを作成できます。
+### 1. ST (Standard) Atlas 
+* Irrlicht（Luanti標準）ベースの標準的なエンジンで、従来の資産を活かしつつ高速化を実現。
+
+### 2. EX (Extended) Atlas 
+* Standardを拡張する未来のAtlasエンジン。SDLとの統合に加えて、外部JSONファイル（設計図）を読み込むことで、16x16や12x14など、あらゆるグリッドサイズのアトラスに即座に対応する動的定義エンジン（DDE）を搭載。
+
+### 3. FT (FreeType) 
+* アトラス画像すら不要とする、SDL2_ttf / FreeType によるダイレクトレンダリング機能を搭載。TrueTypeフォント（TTF/OTF）をそのまま看板に映し出す究極の柔軟性を提供します。
+
+## コンパイルオプション制御
+* 各エンジンはビルド時のフラグ（#ifdef）で個別に有効化可能。環境や用途に合わせた最適なバイナリを作成できます。
 
 ------------------------------
 ## 🛠️ ビルド方法 (How to Build)
@@ -72,6 +83,6 @@ Windows 上の MSYS2 CLANG64 環境でビルドと動作確認を行っていま
 This fork modernizes the Luanti text rendering system for full Unicode support. The newly implemented V4 "EX" Engine leverages SDL2 and a Dynamic Definition Engine (DDE) to support any font atlas specification (16x16, 12x14, etc.) via external JSON profiles. It features high-precision glyph extraction, automatic alpha-channel generation for legacy assets, and pixel-perfect synchronization between Lua and C++.
 ------------------------------
 ## 📝 補足
-AIと人間の協力により、強固なコードベースを構築しました。
+AI(Gemini)と人間の協力により、強固なコードベースを構築しました。
 ------------------------------
 

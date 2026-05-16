@@ -1,5 +1,5 @@
 ------------------------------
-## Luanti Unicode Modernization Project (V4 Engine "EX")
+## Luanti Unicode Modernization Project
 Japanese Documentation (README.md)
 ------------------------------
 ## Overview
@@ -8,23 +8,42 @@ The V4 "EX" Engine, integrated with SDL2 / SDL_image, introduces the Dynamic Def
 
 <img width=600, height=225, src="https://github.com/testersakage/luanti-jtest/blob/master/screenshots/samplesign.png"></img>
 
-## Innovative Features
-## 1. Dynamic Definition Engine (DDE)
+## 🔧 Core Innovations
 
-* Freedom from Specs: Supports various grid sizes through external JSON configuration files.
-* Dynamic Profiles: Switch font sets via Lua scripts without the need to rebuild the engine.
+### 0. Native C++ UTF-8 Glyph API Infrastructure
+* Eliminated high-overhead Lua-layer text parsing and width calculations (`utf8` loops) entirely. Built a bare-metal, native Unicode parsing matrix directly inside the C++ engine core.
 
-## 2. SDL2 / SDL_image Integration
+### 1. Multibyte-Ready C++ Font Atlas Infrastructure
+* Permanently removed legacy Lua-side processing. Implemented a custom Font Atlas Slicing matrix and cache system capable of managing massive CJK (Chinese, Japanese, Korean) font datasets inside native memory space with microsecond efficiency.
 
-* Multi-format Support: Native support for PNG, JPG, and other formats via SDL_image.
-* Alpha Reverse: Automatically converts legacy "white-on-black" assets into modern transparent fonts.
-* Pixel-Perfect Precision: Implements cell_w logic to calculate exact spacing based on the physical dimensions of the atlas image.
+### 2. High-Velocity Texture Compiling: "[utf8combine]" Dedicated Renderer
+* Engineered an exclusive rendering slot for **`[utf8combine]` (as well as `[utf8combineex]` and `[utf8combineft]`)** to intercept text commands and dynamically synthesize transparent sign sheets at hardware speed.
 
-## 3. Multi-Engine Hybrid Architecture
+### 3. Integrated SDL2 / SDL_image / SDL_ttf Graphics Suite
+* Shattered the legacy rendering constraints of Luanti’s native driver (Irrlicht) by embedding the industry-standard media libraries—**SDL2, SDL_image, and SDL_ttf**—deeply into the core pipeline. (Excludes Standard)
 
-* Refined Standard Atlas: Improved stability for legacy 12px/14px assets using the Irrlicht-based engine.
-* FreeType (FT) Engine: Direct rendering of TrueType (TTF) and OpenType (OTF) fonts for ultimate typographical flexibility.
-* Build-time Control: All engines can be toggled via CMake flags (#ifdef control).
+### 4. Encapsulated C++/Lua Bi-Directional Sync Framework: "UTF8SignManager"
+* Implemented a unified, single-instance management hub (**`UTF8SignManager`**) to centrally govern the embedded SDL2 multimedia components and underlying text layout rules.
+
+### 5. Dynamic Definition Engine "DDE" (*EX Atlas only)
+* Fully abolished structural hardcoding of font dimensions and asset specifications inside the C++ runtime. Establishes a flexible **Dynamic Definition Engine (DDE)** that adapts and drives any atlas grid matrix (12px, 14px, 16px, etc.) instantly on the fly by reading asynchronous JSON blueprints or raw script-layer config tables.
+
+---
+
+## 🚀 Multi-Engine Hybrid Configuration
+Offers three distinctive rendering pipelines selectable via compilation states:
+
+### 1. ST (Standard) Atlas 
+* Powered by Luanti's default Irrlicht framework, preserving legacy asset backward-compatibility while significantly accelerating rendering workflows.
+
+### 2. EX (Extended) Atlas 
+* The next-generation atlas pipeline that expands upon the Standard configuration. Deeply integrated with the SDL matrix, featuring the Dynamic Definition Engine (DDE) to automatically parse any custom grid blueprint (16x16, 12x14, etc.) at runtime.
+
+### 3. FT (FreeType) 
+* A direct rasterization engine that completely bypasses texture sheet dependencies via SDL2_ttf and FreeType. Delivers ultimate typographical crispness by rendering high-resolution vector fonts (TTF/OTF) straight to sign nodes.
+
+## ⚙️ Compilation Options
+* Each standalone rendering mode is fully toggled via internal build flags (`#ifdef`), allowing deployment of highly optimized, customized binaries tailored for specialized environments.
 
 ------------------------------
 ## Usage & Integration
