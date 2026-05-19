@@ -63,11 +63,11 @@ Windows 上の MSYS2 CLANG64 環境でビルドと動作確認を行っていま
 ## 1. 既存Modアセット（signs_lib）の活用
 本エンジンは、Luantiで最も普及している [signs_lib](https://github.com/minetest-mods/font_api) のフォントアセット（GNU Unifont形式）を公式にサポートしています。
 
-* 素材の自動認識: signs_lib がインストールされている環境であれば、同梱のサンプルModが自動的にそのテクスチャパスを検索し、EXエンジンへと登録します。
+* 素材の自動認識(EX版のみ): signs_lib がインストールされている環境であれば、同梱のサンプルModが自動的にそのテクスチャパスを検索し、EXエンジンへと登録します。
 * 透過リマスター: 特殊な画像加工なしで、既存の「黒背景・白抜き」アセットを背景透過のドットフォントとして美しく表示します。
 
-## 2. サンプルModによる導入 (mod_utf8signex_sample)
-リポジトリに同梱されている mod_utf8signex_sample を mods/ フォルダに配置して有効化してください。
+## 2. サンプルModによる導入 
+リポジトリに同梱されている3つのサンプルmod(mod_utf8sign_sample, mod_utf8signex_sample, mod_utf8signft_sample)からお好みのものを有効化してください。
 
 * ContentDB対応: ContentDB等からダウンロードしたアセットのパスを自動解決するように構成されています。
 * JSONによる動的定義: C++コードを書き換えることなく、JSONファイルを置くだけで新しいフォントアトラスを自由に追加できます。

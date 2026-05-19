@@ -64,9 +64,6 @@ public:
 
 
 #if UTF8_ATLAS
-	// フォントエンジンから指定した文字のグリフ（画像）を取得します。
-//	static void* getGlyphImage(wchar_t c);
-
 	// imagesource.cpp [utf8combine 命令で実行されるレンダリング関数
 	static void renderUtf8Combine(void *dest_img_ptr, const std::string &command);
 #endif
@@ -80,8 +77,10 @@ public:
 	// imagesource.cpp [utf8combineft 命令で実行されるレンダリング関数
 	static void renderutf8combineft(video::IImage *baseimg, const std::string &spec);
 
-	/* FreeType Cache API */
+	// FreeType キャッシュ制御API用関数
+	static u32 getMaxCacheSize();
 	static u32 getCacheCount();
+	static void setMaxCacheSize(u32 max_size);
 	static void clearCache();
 #endif
 
@@ -90,16 +89,13 @@ private:
 	static RenderTask parseUtf8Spec(const std::string &spec);
 
 #if UTF8_ATLAS
-	// Old Atlas用 複合キャッシュ制御機構（二段構え）
-	static UTF8FontAtlas *m_atlas_cache; 
+	// ST Atlas Cache
+	// utf8_fontatlas へ移動
 #endif
 
 #if UTF8_SDL2_ATLAS
-	//  Atlas Cache
-//	static bool extractAtlasGlyph(u32 code, FTCachedGlyph &out_glyph);
-
-//	static std::map<u64, EXCachedChar> UTF8FontEngine::m_char_cache;
-//	static std::map<u64, EXCachedPage> UTF8FontEngine::m_page_cache;
+	// EX Atlas Cache
+	// utf8_fontatlas へ移動
 #endif
 
 #if UTF8_SDL2_FREETYPE

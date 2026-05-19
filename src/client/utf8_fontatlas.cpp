@@ -11,9 +11,6 @@
 #include <stdexcept>
 
 
-// static メンバ変数の実体定義を忘れずに！
-//std::map<int, ImageRGBA> UTF8FontAtlas::m_atlas_pages;
-
 // 1. 切り出し関数を可変幅(target_w)対応に
 ImageRGBA UTF8FontAtlas::crop_glyph_custom(const ImageRGBA &src, int gx, int gy, int target_w, int target_h)
 {
@@ -42,31 +39,24 @@ ImageRGBA UTF8FontAtlas::crop_glyph_custom(const ImageRGBA &src, int gx, int gy,
 	return out;
 }
 
-/* --- 1. 切り出し関数（上に置くか、プロトタイプ宣言が必要） --- */
-/**
-static ImageRGBA crop_glyph_12x12(const ImageRGBA &src, int gx, int gy)
-{
-	ImageRGBA out;
-	out.width = 12;
-	out.height = 12;
-	out.data.resize(12 * 12 * 4);
-
-	for (int yy = 0; yy < 12; yy++) {
-		for (int xx = 0; xx < 12; xx++) {
-			int sx = gx + xx;
-			int sy = gy + yy;
-			if (sx >= src.width || sy >= src.height) continue;
-
-			int src_i = (sy * src.width + sx) * 4;
-			int dst_i = (yy * 12 + xx) * 4;
-			for (int k = 0; k < 4; k++) out.data[dst_i + k] = src.data[src_i + k];
-		}
-	}
-	return out;
-}
-*/
 
 #if UTF8_ATLAS
+// キャッシュ関連
+std::map<int, ImageRGBA> UTF8FontAtlas::m_st_pages;
+std::list<int> UTF8FontAtlas::m_st_page_order;
+size_t UTF8FontAtlas::m_st_max_pages = 4;
+
+// st Atlas API Cache count
+void UTF8FontAtlas::getPageCacheSt(u32 &page_count, u32 &max_pages) {
+	page_count = (u32)m_page_cache.size();
+	max_pages = (u32)m_ex_max_pages;
+}
+
+void UTF8FontAtlas::setMaxCacheSizeSt(u32 max_pages) {
+	m_st_max_pages = max_pages;
+	actionstream << "ST_CACHE: Set Max size: " << m_st_max_pages << std::endl;
+}
+
 /* --- 2. PNGロード関数 --- */
 ImageRGBA UTF8FontAtlas::load_png_rgba(const std::string &path)
 {
@@ -94,15 +84,6 @@ ImageRGBA UTF8FontAtlas::load_png_rgba(const std::string &path)
 	}
 	img->drop();
 	return out;
-}
-
-std::map<int, ImageRGBA> UTF8FontAtlas::m_st_pages;
-std::list<int> UTF8FontAtlas::m_st_page_order;
-size_t UTF8FontAtlas::m_st_max_pages = 4;
-
-// st Atlas API Cache count
-u32 UTF8FontAtlas::getPageCache() {
-    return (u32)m_st_pages.size();
 }
 
 // STD Atlas 用
@@ -149,48 +130,6 @@ const ImageRGBA &UTF8FontAtlas::loadPage(int page)
 }
 
 /* --- 4. メインの切り出し関数 --- */
-/*
-ImageRGBA UTF8FontAtlas::getGlyphImage(int codepoint)
-{
-    if (codepoint < 0) throw std::runtime_error("Invalid CP");
-
-    // 【ログ】制御文字などの低位コードポイント報告
-    if (codepoint < 32) {
-        infostream << "UTF8FontAtlas: Low codepoint (possible ghost): 0x" 
-                   << std::hex << codepoint << std::dec << std::endl;
-    }
-
-    int page = codepoint / 256;
-    int index = codepoint % 256;
-
-    // 1. ページのロード
-    const ImageRGBA &atlas = loadPage(page);
-
-    // 2. ★ アトラスの実サイズから「1行の高さ」を動的に算出
-    // アトラスは 256文字(32x8グリッド)なので、高さ / 8行 でステップを出す
-    // 96pxなら 12、112pxなら 14 と自動判定される
-    u32 actual_line_h = atlas.height / 8;
-
-    // 3. ★ 職人の黄金律を適用 (幅の判定)
-    // ASCII(00) および 半角カナ(FF) の範囲を 6px、それ以外を 12px とする
-    int current_w = 12;
-    if (page == 0x00 && index <= 0x7F) {
-        current_w = 6;
-    } else if (page == 0xFF && (index >= 0x61 && index <= 0x9F)) {
-        current_w = 6;
-    }
-
-    // 4. 座標計算
-    // 横(gx)は常に 12px 刻みのグリッド
-    // 縦(gy)はステップ高(12 or 14)に応じた位置を計算
-    int gx = (index % 32) * 12;
-    int gy = (index / 32) * actual_line_h;
-
-    // 5. 切り出し実行 (高さは画像の実態に合わせる)
-    return crop_glyph_custom(atlas, gx, gy, current_w, actual_line_h);
-}
-*/
-// // src/client/utf8_fontatlas.cpp
 ImageRGBA UTF8FontAtlas::getGlyphImage(int codepoint)
 {
 	if (codepoint < 0) throw std::runtime_error("Invalid CP");
@@ -251,55 +190,76 @@ ImageRGBA UTF8FontAtlas::getGlyphImage(int codepoint)
 
 #if UTF8_SDL2_ATLAS
 
-ImageRGBA UTF8FontAtlas::load_png_rgbaEX(const std::string &path)
-{
-    // 1. SDL_image で読み込み
-    SDL_Surface* loaded_surface = IMG_Load(path.c_str());
-    if (!loaded_surface) {
-        // ここでエラーが出れば「パスの間違い」が確定
-        errorstream << "UTF8FontAtlas: EX Load Failed: " << path 
-                    << " Error: " << IMG_GetError() << std::endl;
-        return ImageRGBA();
-    }
-
-    // 2. ★【心臓部】RGBA 32bit 形式に強制変換
-    // これにより、どんなPNGでも「R,G,B,A」の順で並ぶことが保証される
-    SDL_Surface* optimized = SDL_ConvertSurfaceFormat(loaded_surface, SDL_PIXELFORMAT_RGBA32, 0);
-    SDL_FreeSurface(loaded_surface);
-
-    if (!optimized) return ImageRGBA();
-
-    // 3. ImageRGBA 構造体へ詰め替え
-    ImageRGBA out;
-    out.width = optimized->w;
-    out.height = optimized->h;
-    
-    // ピクセルデータを一気にベクタへコピー
-    size_t data_size = out.width * out.height * 4;
-    out.data.assign((unsigned char*)optimized->pixels, 
-                    (unsigned char*)optimized->pixels + data_size);
-
-    SDL_FreeSurface(optimized);
-    
-    // 4. 自白ログ（debug.txt や --info で確認可能）
-    infostream << "UTF8FontAtlas: EX-Load Success [" << out.width << "x" << out.height 
-               << "] Path: " << path << std::endl;
-
-    return out;
-}
-
 std::map<int, ImageRGBA> UTF8FontAtlas::m_char_cache; // 文字画像
 std::map<int, ImageRGBA> UTF8FontAtlas::m_page_cache; // ページ画像
+std::list<int> UTF8FontAtlas::m_ex_char_order;        // 登録順（FIFO用）
 std::list<int> UTF8FontAtlas::m_ex_page_order;        // 登録順（FIFO用）
+size_t UTF8FontAtlas::m_ex_max_chars = 64;           // minetest.confから読み込む上限
 size_t UTF8FontAtlas::m_ex_max_pages = 4;           // minetest.confから読み込む上限
 
 // ex Atlas API Cache count
-u32 UTF8FontAtlas::getCharCacheEx() {
-    return (u32)m_char_cache.size();
+void UTF8FontAtlas::getMaxCacheSizeEx(u32 &max_chars, u32 &max_pages) {
+	max_chars = (u32)m_ex_max_chars;
+	max_pages = (u32)m_ex_max_pages;
 }
 
-u32 UTF8FontAtlas::getPageCacheEx() {
-    return (u32)m_page_cache.size();
+void UTF8FontAtlas::getCacheCountEx(u32 &char_count, u32 &page_count) {
+	char_count = (u32)m_char_cache.size();
+	page_count = (u32)m_page_cache.size();
+}
+
+void UTF8FontAtlas::setMaxCacheSizeEx(u32 max_chars, u32 max_pages) {
+	m_ex_max_chars = max_chars;
+	m_ex_max_pages = max_pages;
+	actionstream << "EX_CACHE: Set Max size: " << m_ex_max_chars << " / " << m_ex_max_pages << std::endl;
+}
+
+void UTF8FontAtlas::clearCacheEx(bool char_flag, bool page_flag) {
+	if (char_flag) {
+		m_char_cache.clear();
+	}
+	if (page_flag) {
+		m_page_cache.clear();
+		m_ex_page_order.clear(); // 【重要】FIFO管理リストも一緒に大掃除してゴーストバグを根絶！
+	}
+	actionstream << "EX_CACHE: Manual Clear (Char: " << char_flag << " / Page: " << page_flag << ")." << std::endl;
+}
+
+ImageRGBA UTF8FontAtlas::load_png_rgbaEX(const std::string &path)
+{
+	// 1. SDL_image で読み込み
+	SDL_Surface* loaded_surface = IMG_Load(path.c_str());
+	if (!loaded_surface) {
+		// ここでエラーが出れば「パスの間違い」が確定
+		errorstream << "UTF8FontAtlas: EX Load Failed: " << path 
+					<< " Error: " << IMG_GetError() << std::endl;
+		return ImageRGBA();
+	}
+
+	// 2. ★【心臓部】RGBA 32bit 形式に強制変換
+	// これにより、どんなPNGでも「R,G,B,A」の順で並ぶことが保証される
+	SDL_Surface* optimized = SDL_ConvertSurfaceFormat(loaded_surface, SDL_PIXELFORMAT_RGBA32, 0);
+	SDL_FreeSurface(loaded_surface);
+
+	if (!optimized) return ImageRGBA();
+
+	// 3. ImageRGBA 構造体へ詰め替え
+	ImageRGBA out;
+	out.width = optimized->w;
+	out.height = optimized->h;
+	
+	// ピクセルデータを一気にベクタへコピー
+	size_t data_size = out.width * out.height * 4;
+	out.data.assign((unsigned char*)optimized->pixels, 
+					(unsigned char*)optimized->pixels + data_size);
+
+	SDL_FreeSurface(optimized);
+	
+	// 4. 自白ログ（debug.txt や --info で確認可能）
+	infostream << "UTF8FontAtlas: EX-Load Success [" << out.width << "x" << out.height 
+			   << "] Path: " << path << std::endl;
+
+	return out;
 }
 
 // EX Atlas 用
@@ -363,6 +323,14 @@ ImageRGBA UTF8FontAtlas::getGlyphImageEX(int codepoint)
 {
 	if (codepoint < 0) return ImageRGBA();
 
+	// ─── 🛡️ 【新設 1. 最速キャッシュ部屋チェック】 ───
+	// もし、すでに過去に切り出し（crop）が終わって文字キャッシュの蔵に保管されていれば、
+	// 面倒な座標計算や画像ロード、crop 処理を 100% 完全にスキップして、蔵から一瞬で爆速返却！
+	if (m_char_cache.find(codepoint) != m_char_cache.end()) {
+		return m_char_cache[codepoint];
+	}
+
+	// ─── 🚨 ここから先は、蔵に文字が無かった（初登場の文字）時だけの、最初で最後の切り出し処理 ───
 	int page = codepoint / 256;
 	int index = codepoint % 256;
 
@@ -373,29 +341,39 @@ ImageRGBA UTF8FontAtlas::getGlyphImageEX(int codepoint)
 	auto &mgr = *UTF8SignManager::getInstance();
 	const AtlasDefinition &def = mgr.getSelectedAtlas().def;
 
-	// --- ★動的な「1部屋の幅」の算出 ---
-	// 画像の全幅を列数で割ることで、12px規格か16px規格かを自動判別
+	// 動的な「1部屋の幅」の算出
 	u32 cell_w = atlas.width / def.grid_columns;
-	
-	// 縦の歩幅（JSONの grid_size があれば優先、なければ 8行分割）
 	u32 step_h = (def.grid_size > 0) ? def.grid_size : (atlas.height / 8);
-
-	// --- ★切り出し幅(current_w)の決定 ---
-	u32 current_w = cell_w; // 基本は「部屋の幅いっぱい」
+	u32 current_w = cell_w; 
 	
-	// 半角判定（0x00: ASCII, 0xFF: 半角カナ）
+	// 半角判定
 	if ((page == 0x00 && index <= 0x7F) || (page == 0xFF && (index >= 0x61 && index <= 0x9F))) {
-		// 部屋の幅の半分を「半角」として扱う
 		current_w = cell_w / 2;
 	}
 
-	// --- ★座標計算 ---
-	// 常に「cell_w (実寸の歩幅)」を基準にすることで、ズレを物理的に排除
+	// 座標計算
 	int gx = (index % def.grid_columns) * cell_w;
 	int gy = (index / def.grid_columns) * step_h;
 
-	// 切り出し実行
-	return crop_glyph_custom(atlas, gx, gy, (int)current_w, (int)step_h);
+	// ハサミで切り出し実行
+	ImageRGBA glyph = crop_glyph_custom(atlas, gx, gy, (int)current_w, (int)step_h);
+
+	// ─── 🛡️ 【新設 2. 文字キャッシュへの格納 ＆ FIFOリミッター発動！】 ───
+	// メモリ内の文字キャッシュ数が、設定された上限（デフォルト64文字）に達しているかチェック
+	if (m_char_cache.size() >= m_ex_max_chars && !m_ex_char_order.empty()) {
+		// 一番古くに入室した文字コードを特定して追い出す（メモリ解放）
+		int oldest_cp = m_ex_char_order.front();
+		m_ex_char_order.pop_front();
+		m_char_cache.erase(oldest_cp);
+	}
+
+	// 今回切り出したピクセルデータを、文字キャッシュの部屋へ安全に常駐保管！
+	m_char_cache[codepoint] = glyph;
+	
+	// 新入りの文字コードを、最新メンバーとして順番待ちリストの末尾へ登録！
+	m_ex_char_order.push_back(codepoint);
+
+	return glyph; // 焼き上がった極上の文字データを返却！
 }
 #endif
 

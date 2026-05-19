@@ -46,24 +46,25 @@ Offers three distinctive rendering pipelines selectable via compilation states:
 * Each standalone rendering mode is fully toggled via internal build flags (`#ifdef`), allowing deployment of highly optimized, customized binaries tailored for specialized environments.
 
 ------------------------------
-## Usage & Integration
+## 🚀 Usage & Integration
+This engine aims to provide state-of-the-art rendering quality while maximizing the utilization of the vast array of existing sign mod assets available in Luanti.
 ## 1. Leveraging Existing Assets (e.g., signs_lib)
-This engine officially supports the GNU Unifont assets from the widely used [signs_lib](https://github.com/minetest-mods/font_api).
+This engine officially supports the GNU Unifont font assets from the widely used signs_lib framework.
 
-* Auto-Detection: The included sample mod automatically locates signs_lib textures and registers them with the EX engine.
-* Transparency Remaster: Renders legacy assets as high-quality transparent fonts without manual image editing.
+* Automated Asset Discovery (EX Engine Only): If signs_lib is installed in your environment, the included sample mod automatically locates its texture paths and registers them with the EX engine.
+* Transparency Remaster: Renders legacy "black-background, white-text" assets as high-quality transparent pixel fonts instantly, without requiring manual image editing or preprocessing.
 
-## 2. Getting Started with the Sample Mod
-Enable mod_utf8signex_sample (included in this repository) to experience the EX engine immediately.
+## 2. Getting Started with Sample Mods
+Enable your preferred engine style by activating any of the three sample mods included in this repository (mod_utf8sign_sample, mod_utf8signex_sample, or mod_utf8signft_sample).
 
-* ContentDB Ready: The init.lua is pre-configured to resolve asset paths automatically in various environments.
-* DDE Reference: Includes JSON profiles for PixelMplus12 and signs_lib as practical implementation examples.
+* ContentDB Ready: Pre-configured to automatically resolve asset paths even when downloaded and installed via ContentDB or alternative remote repositories.
+* Dynamic JSON Profiling: Allows developers to add entirely new font atlas definitions simply by dropping in a configuration JSON file, completely eliminating the need to modify or recompile C++ core source code.
 
 ## ⚠️ Important Compatibility Notes
 
-* Asset-Only Integration: While this engine can utilize font textures from other mods, it does not automatically upgrade the rendering of those mods' existing sign nodes/entities.
-* Mod Modification: To use EX rendering on existing signs from other mods, their Lua code must be modified to use the [utf8combineex:... command.
-* Recommended Use: For best results, use the included sample mod or develop new mods designed specifically for the EX Atlas engine.
+* Asset-Only Integration: While this engine borrows and utilizes font images (assets) from frameworks like signs_lib, it does not automatically override or upgrade the native rendering logic of sign nodes or entities provided by those third-party mods.
+* Mod Modification Requirements: To upgrade existing signs from other mods to use the high-definition EX Atlas engine, their underlying Lua codebase must be modified to output texture commands in the [utf8combineex:... format.
+* Recommended Deployment: For the best possible experience, it is highly recommended to use the included sample mods or develop new mods designed specifically around this unified font engine framework.
 
 ------------------------------
 ## How to Build

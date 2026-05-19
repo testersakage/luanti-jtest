@@ -232,8 +232,10 @@ namespace l_utf8sign {
 	// --- Extended Atlas専用 (minetest.utf8sign.ex.*) ---
 	int l_ex_load_atlas_config(lua_State *L);
 	int l_ex_get_atlas_status(lua_State *L);
-	int l_ex_get_char_cache(lua_State *L);
-	int l_ex_get_page_cache(lua_State *L);
+	int l_ex_get_cache_size(lua_State *L);
+	int l_ex_get_cache_count(lua_State *L);
+	int l_ex_set_cache_size(lua_State *L);
+	int l_ex_clear_cache(lua_State *L);
 #endif
 
 #if UTF8_SDL2_FREETYPE

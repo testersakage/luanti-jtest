@@ -106,22 +106,7 @@ RenderTask UTF8FontEngine::parseUtf8Spec(const std::string &spec)
 			task.color = video::SColor(255, (val >> 16) & 0xFF, (val >> 8) & 0xFF, val & 0xFF);
 		} catch (...) {}
 	}
-/*
-	// --- 5. 文字コード列 ---
-	if (utf8_tag_pos != std::string::npos) {
-		std::string list = spec.substr(utf8_tag_pos + 5);
-		if (!list.empty() && list.back() == ']') list.pop_back();
 
-		std::stringstream ss(list);
-		std::string item;
-		while (std::getline(ss, item, ',')) {
-			if (item.empty()) continue;
-			try {
-				task.codes.push_back(std::stoul(item));
-			} catch (...) {}
-		}
-	}
-*/
 	// --- 5. テキスト内容の解析 (エンジンごとに「合図」を決める) ---
 	if (task.engine_type == UTF8EngineType::EX || task.engine_type == UTF8EngineType::FT) {
 		// --- 【EX/FT専用】 ":UTF8:" を探す ---
@@ -158,75 +143,14 @@ RenderTask UTF8FontEngine::parseUtf8Spec(const std::string &spec)
 }
 
 #if UTF8_ATLAS
-//  staticメンバの実体(Cache)を定義
-UTF8FontAtlas* UTF8FontEngine::m_atlas_cache = nullptr;
-
-/*
-//  関数 void* UTF8FontEngine::getGlyphImage(wchar_t c)
-void* UTF8FontEngine::getGlyphImage(wchar_t c)
-{
-	video::IVideoDriver* driver = RenderingEngine::get_video_driver();
-	gui::IGUIFont *font = g_fontengine->getFont(12); // 12px
-	if (!font) font = g_fontengine->getFont(); // 失敗したらデフォルトにフォールバック
-	if (!driver || !font) return nullptr;
-
-	wchar_t temp_str[] = {c, 0};
-	core::dimension2du dim = font->getDimension(temp_str);
-	if (dim.Width == 0) return nullptr;
-
-	// 1. 文字を描くための「一時的なテクスチャ（VRAM上のキャンバス）」を作る
-	video::ITexture* render_tex = driver->addRenderTargetTexture(dim, "glyph_tmp_rt");
-	if (!render_tex) return nullptr;
-
-	// 2. 描画先を画面から「このテクスチャ」へ切り替える
-	driver->setRenderTarget(render_tex, true, true, video::SColor(0,0,0,0));
-
-	// 3. 描画命令！ (これでテクスチャに文字が書き込まれる)
-	font->draw(temp_str, core::rect<s32>(0, 0, dim.Width, dim.Height), 
-			   video::SColor(255, 255, 255, 255));
-
-	// 4. 描画先を元（画面）に戻す
-	driver->setRenderTarget(nullptr);
-
-	// 5. 【重要】テクスチャ（VRAM）から画像（RAM/IImage）へピクセルを引き抜く
-	video::IImage* glyph_img = driver->createImage(render_tex, core::position2d<s32>(0,0), dim);
-
-	if (glyph_img) {
-		// --- ここでアルファ補正（2値化）を注入！ ---
-		core::dimension2du size = glyph_img->getDimension();
-		for (u32 y = 0; y < size.Height; y++) {
-			for (u32 x = 0; x < size.Width; x++) {
-				video::SColor pixel = glyph_img->getPixel(x, y);
-				
-				// しきい値（例えば30）以上なら、完全不透明(255)にブースト
-				// これで「消えかかっていた横棒」がクッキリ浮かび上がります
-				if (pixel.getAlpha() > 79) {
-					pixel.setAlpha(255);
-					// 看板側で色が反転したり黒くなったりするのを防ぐため、
-					// RGBも最大値（白）にしておくのが安全です
-					pixel.setRed(255);
-					pixel.setGreen(255);
-					pixel.setBlue(255);
-				} else {
-					pixel.setAlpha(0);
-				}
-				glyph_img->setPixel(x, y, pixel);
-			}
-		}
-	}
-	// 6. 使い終わったテクスチャを消去
-	driver->removeTexture(render_tex);
-	return (void*)glyph_img;
-}
-*/
 
 // 関数 UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &command)
 {
-	actionstream << "RenderUTF8Combine: Old Atlas Glyph Engine Called!" << std::endl;
+	actionstream << "RenderUTF8Combine: Standard Atlas Glyph Engine Called!" << std::endl;
 
 	// ---  準備：キャンバスと蔵の確認 ---
-	if (!m_atlas_cache) m_atlas_cache = new UTF8FontAtlas();
+//	if (!m_atlas_cache) m_atlas_cache = new UTF8FontAtlas();
 	if (!dest_img_ptr) return;
 	video::IImage *dest_img = reinterpret_cast<video::IImage*>(dest_img_ptr);
 	dest_img->fill(video::SColor(0, 0, 0, 0));
@@ -263,38 +187,11 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 
 		u32 x_cursor = start_x;
 		std::vector<int> cps = utf8_53::to_codepoints(line_str);
-/*
-		for (int cp : cps) {
-			u32 current_w = 12; 
-			try {
-				ImageRGBA glyph = m_atlas_cache->getGlyphImage(cp);
-				if (x_cursor + glyph.width > canvas_w) break;
-				
-				current_w = glyph.width;
 
-				for (int gy = 0; gy < (int)glyph.height; gy++) {
-					for (int gx = 0; gx < (int)glyph.width; gx++) {
-						int i = (gy * glyph.width + gx) * 4;
-
-						video::SColor pixel_color = target_color;
-						pixel_color.setAlpha(glyph.data[i + 3]); 
-
-						if (pixel_color.getAlpha() > 0) {
-							// 14px高アトラスなら gy=13 (14px目) まで描画される
-							dest_img->setPixel(x_cursor + gx, y_cursor + gy, pixel_color);
-						}
-					}
-				}
-			} catch (...) {}
-			
-			x_cursor += current_w; 
-			if (x_cursor >= canvas_w) break; 
-		}
-*/
 		for (int cp : cps) {
 			u32 current_w = cfg.st_char_w_zen; // デフォルトは全角幅
 			try {
-				ImageRGBA glyph = m_atlas_cache->getGlyphImage(cp);
+				ImageRGBA glyph = UTF8FontAtlas::getGlyphImage(cp);
 				if (x_cursor + glyph.width > canvas_w) break;
 
 				// ─── 【本題】このST看板のスイッチがONなら、全半角比率を取得 ───
@@ -342,84 +239,9 @@ void UTF8FontEngine::renderUtf8Combine(void *dest_img_ptr, const std::string &co
 
 #if UTF8_SDL2_ATLAS
 
-/*
-// Atlasからピクセルを抜き出して蔵(Glyph)の形にする
-bool UTF8FontEngine::extractAtlasGlyph(u32 code, FTCachedGlyph &out_glyph)
-{
-	// 1. マネージャー（知識層）から情報を仕入れる
-	auto manager = UTF8SignManager::getInstance();
-	if (manager->getAvailableAtlases().empty()) {
-		actionstream << "EXTRACT: No Atlas available!" << std::endl;
-		return false;
-	}
-
-	const auto &atlases = manager->getAvailableAtlases();
-	// ひとまずは最初のアトラスを使用
-	const auto &res = atlases[0];
-	const auto &def = res.def;
-
-	// 2. 座標計算 (32x8などの独自レイアウトに対応)
-	u32 page = (code >> 8) & 0xFF;
-	u32 char_index = code & 0xFF; // 1ページ(256文字)内の通し番号
-
-	// JSONの grid_columns (32等) を使って行列を算出
-	u32 cols = def.grid_columns; 
-	u32 col = char_index % cols;
-	u32 row = char_index / cols;
-
-	// 3. 画像ロード
-	video::IVideoDriver *driver = RenderingEngine::get_video_driver(); 
-	char filename[256];
-	snprintf(filename, sizeof(filename), def.file_pattern.c_str(), page);
-	std::string full_path = res.full_path + DIR_DELIM + filename;
-
-	video::IImage *img = driver->createImageFromFile(full_path.c_str());
-	if (!img) return false;
-
-	// 4. 蔵(Glyph)の箱を準備
-	out_glyph.bitmap.clear();
-	out_glyph.width = def.glyph_w; // 12
-	out_glyph.rows  = def.glyph_h; // 14
-	
-	// 配置設定 (行間0で成立する14px設計を尊重)
-	out_glyph.bitmap_left = 0; 
-	out_glyph.bitmap_top  = def.glyph_h; 
-	// 半角(han)は全角(zen)の半分として歩幅を設定
-	out_glyph.advance     = (code < 128) ? (def.glyph_w / 2) : def.glyph_w; 
-
-	// 5. 職人の「スライス ＆ 抽出」ループ
-	for (u32 y = 0; y < def.glyph_h; y++) {
-		for (u32 x = 0; x < def.glyph_w; x++) {
-			// grid_size(14) 単位で座標を特定。+1などの微調整は画像に合わせて
-			u32 px = (col * def.grid_size) + x; 
-			u32 py = (row * def.grid_size) + y;
-			
-			if (px < img->getDimension().Width && py < img->getDimension().Height) {
-				video::SColor color = img->getPixel(px, py);
-				
-				// アルファ値を採用（フォント画像が白黒ならRed値を流用するのも手）
-				u8 alpha = color.getAlpha();
-
-				// 魔導書の指示があれば反転
-				if (def.alpha_reverse) {
-					alpha = 255 - alpha;
-				}
-				out_glyph.bitmap.push_back(alpha);
-			} else {
-				out_glyph.bitmap.push_back(0); // 範囲外は透明
-			}
-		}
-	}
-
-	img->drop(); 
-	return true;
-}
-*/
-
-
 void UTF8FontEngine::renderutf8combineex(void *dest_img_ptr, const std::string &command)
 {
-	actionstream << "RenderUTF8Combine: SDL2 Atlas Engine Called!" << std::endl;
+	actionstream << "RenderUTF8Combine: SDL2 Extended Atlas Engine Called!" << std::endl;
 
 	if (!dest_img_ptr) return;
 	video::IImage *dest_img = reinterpret_cast<video::IImage*>(dest_img_ptr);
@@ -505,6 +327,29 @@ std::map<u64, FTCachedGlyph> UTF8FontEngine::m_glyph_cache;
 std::list<u64> UTF8FontEngine::m_cache_order;
 bool UTF8FontEngine::m_cache_zero_bypass = false; // 初回にサイズ0ならtrueにする
 size_t UTF8FontEngine::m_max_cache_size = 256;    // デフォルト256文字程度
+
+// FreeType API Get Max Cache Size
+u32 UTF8FontEngine::getMaxCacheSize() {
+    return (u32)m_max_cache_size;
+}
+
+// FreeType API Get Cache count
+u32 UTF8FontEngine::getCacheCount() {
+    return (u32)m_glyph_cache.size();
+}
+
+// FreeType API Set Max Cache Size
+void UTF8FontEngine::setMaxCacheSize(u32 max_size) {
+    m_max_cache_size = max_size;
+    actionstream << "FT_CACHE: Set Max size: " << m_max_cache_size << std::endl;
+}
+
+// FreeType API Set Cache clear
+void UTF8FontEngine::clearCache() {
+    m_glyph_cache.clear();
+    m_cache_order.clear();
+    actionstream << "FT_CACHE: Manual Clear." << std::endl;
+}
 
 // FreeType 専用の蔵（キャッシュ）制御
 FTCachedGlyph* UTF8FontEngine::getOrCacheGlyph(u32 code, void* face_ptr, u32 load_flags) {
@@ -676,17 +521,6 @@ void UTF8FontEngine::renderutf8combineft(video::IImage *baseimg, const std::stri
 		cursor_x += char_advance;
 	}
 
-}
-
-// FreeType API Cache count
-u32 UTF8FontEngine::getCacheCount() {
-    return (u32)m_glyph_cache.size();
-}
-
-// FreeType API Cache clear
-void UTF8FontEngine::clearCache() {
-    m_glyph_cache.clear();
-    actionstream << "FT_CACHE: Manual Clear." << std::endl;
 }
 #endif
 

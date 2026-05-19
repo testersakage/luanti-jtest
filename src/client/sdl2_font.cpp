@@ -19,36 +19,43 @@ namespace sdl2_font {
 
 	static FT_Library ft_library = nullptr;
 	static FT_Face ft_face = nullptr;
-	static int last_ft_error = 0; // ★これを追加！
-	static u32 last_char_advance = 0; // 歩幅を記録する箱
+	static int last_ft_error = 0; 
+	static u32 last_char_advance = 0; 
 	static std::string last_attempted_path = "";
 
 	u32 get_last_char_advance() { return last_char_advance; }
-
 	void* get_library_ptr() { return (void*)ft_library; }
 	void* get_face_ptr()    { return (void*)ft_face; }
 	int get_last_error() { return last_ft_error; }
 	std::string get_last_path() { return last_attempted_path; }
 
-	// ★ 職人の備忘録：現在ロード中の設定をメモしておく
-	static std::string loaded_path = "";
-	static unsigned int loaded_size = 0;
-	static int loaded_index = -1;
+	// ─── 🏆 【マルチフォント化を匂わせる、クリーンな絶対記憶インフラ】 ───
+	static std::string s_last_owner = ""; // 最後に初期化した主の名前
+	static std::string s_last_path  = ""; // 最後に初期化したフォントパス
+	static unsigned int s_last_size = 0;  // 最後に初期化したフォントサイズ
+	static int s_last_index         = -1; // 最後に初期化したインデックス
 
-	// --- 外部から現在の状態を自白させるための関数 ---
-	//std::string get_last_path()  { return last_attempted_path; }
-	unsigned int get_last_size() { return loaded_size; }
-	int get_last_index()         { return loaded_index; }
+	// 外部から現在の主の状態を覗き見させるためのゲッター
+	std::string get_current_owner() { return s_last_owner; }
+	unsigned int get_last_size()   { return s_last_size; }
+	int get_last_index()           { return s_last_index; }
 
 
-bool init(const std::string &font_path, unsigned int font_size, int requested_index)
+// ─── 🔄 【進化版初期化関数：引数の最後に owner を残してロマンを完全定着】 ───
+bool init(const std::string &font_path, unsigned int font_size, int requested_index, const std::string &owner)
 {
-	// 1. パスと要求を自白させる
-	actionstream << "SDL2Font: [TRACE] init called. Path: " << font_path 
+	// ─── 🛡️ 【多重初期化・二重ロードを 100% 物理防衛する一本道ガード】 ───
+	// 「主の名前」と「フォントの住所」と「サイズ」が前回と 1px も狂いなく同じなら、
+	// すでに FreeType の顔（Face）はスタンバイ状態なので、重いロードを完全スルーして爆速リターン！
+	if (ft_library != nullptr && s_last_owner == owner && s_last_path == font_path && s_last_size == font_size) {
+		return true;
+	}
+
+	actionstream << "SDL2Font: [TRACE] init called by [" << owner << "]. Path: " << font_path 
 	             << " Size: " << font_size << " Requested Index: " << requested_index << std::endl;
 	last_attempted_path = font_path;
 
-	// 2. FreeType ライブラリの初期化 (シングルトン的な扱い)
+	// FreeType ライブラリの大元初期化 (シングルトン / TTF_WasInit 代替ガード)
 	if (ft_library == nullptr) {
 		FT_Error err = FT_Init_FreeType(&ft_library);
 		if (err) {
@@ -58,14 +65,13 @@ bool init(const std::string &font_path, unsigned int font_size, int requested_in
 		}
 	}
 
-	// 3. フォントの入れ替え（古いのがあれば捨てる）
+	// 古いフォントを安全に解放
 	if (ft_face) {
 		FT_Done_Face(ft_face);
 		ft_face = nullptr;
 	}
 
-	// --- 職人の安全インデックス判定 ---
-	// まず0番で読み込んで、含まれているフォント数を確認する
+	// 職人の安全インデックス判定 (0番で読み込んで含まれているフォント数を確認する)
 	FT_Face temp_face;
 	if (FT_New_Face(ft_library, font_path.c_str(), 0, &temp_face)) {
 		errorstream << "SDL2Font: FAILED to load font file at " << font_path << std::endl;
@@ -86,130 +92,25 @@ bool init(const std::string &font_path, unsigned int font_size, int requested_in
 		return false;
 	}
 
-	// 4. 文字マップとサイズの設定
+	// 文字マップとサイズの設定
 	FT_Select_Charmap(ft_face, FT_ENCODING_UNICODE);
 	FT_Set_Pixel_Sizes(ft_face, 0, font_size);
 	
-	// --- 職人の詳細自白ログ ---
-	FT_Int major, minor, patch;
-	FT_Library_Version(ft_library, &major, &minor, &patch);
-/*
-#if FT_DEBUG
-	actionstream << "SDL2Font: === FT BACKEND READY ===" << std::endl;
-	actionstream << "SDL2Font: FreeType Version: " << major << "." << minor << "." << patch << std::endl;
-	actionstream << "SDL2Font: Family Name: " << (ft_face->family_name ? ft_face->family_name : "Unknown") << std::endl;
-	actionstream << "SDL2Font: Style Name:  " << (ft_face->style_name ? ft_face->style_name : "Unknown") << std::endl;
-	actionstream << "SDL2Font: Face Index:  " << final_index << " / " << num_faces << std::endl;
-	actionstream << "SDL2Font: Pixel Size:  " << font_size << std::endl;
-	actionstream << "SDL2Font: ==========================" << std::endl;
-#endif
-*/
-	// ★ 成功した瞬間に、今回の設定を「備忘録」に書き込む！
-//	loaded_path  = font_path;
-	loaded_size  = font_size;
-	loaded_index = final_index; // 実際に確定したインデックス
-
-/*
-#if UTF8_SDL2_ATLAS
-// asuna check
-	// --- 全ゲームをスキャンして Asuna の蔵を探す ---
-	std::vector<SubgameSpec> games = getAvailableGames(); 
-	std::string detected_atlas_path = "";
-
-	// ★ 1. Asunaの「素性」を定義
-	AtlasDefinition asuna_def;
-	asuna_def.mod_name     = "asuna";
-	asuna_def.sub_path     = std::string("mods") + DIR_DELIM + "signs_lib" + DIR_DELIM + "textures" + DIR_DELIM + "unifont";
-	asuna_def.file_pattern = "signs_lib_uni%02x.png";
-	asuna_def.grid_size   = 16;
-
-	actionstream << "SDL2Font: Scanning installed games for Atlas resources..." << std::endl;
-
-	for (const auto &spec : games) {
-		// ID（フォルダ名）に asuna が含まれているかチェック
-		if (spec.id.find(asuna_def.mod_name) != std::string::npos) {
-			// spec.path を使って unifont ディレクトリを特定
-			std::string potential_path = spec.path + DIR_DELIM + asuna_def.sub_path;
-			
-			if (fs::PathExists(potential_path + DIR_DELIM + "signs_lib_uni00.png")) {
-				detected_atlas_path = potential_path;
-				actionstream << "SDL2Font: >>> Target Atlas Found in Game: " << spec.id << " <<<" << std::endl;
-
-				// ★ 2. マネージャーの「棚」に登録する
-				UTF8SignManager::getInstance()->registerAtlas(asuna_def, potential_path);
-				break;
-			}
-		}
-	}
-
-	if (detected_atlas_path.empty()) {
-		actionstream << "SDL2Font: No suitable Atlas resource found." << std::endl;
-	}
-// asuna check
-#endif
+	// ─── 🎯 【聖なる所有権 ＆ スペックの確定メモ】 ───
+	// ロードが完全に成功したため、現在の状態を脳内メモリへガチッと刻印！
+	s_last_owner = owner;
+	s_last_path  = font_path;
+	s_last_size  = font_size;
+	s_last_index = final_index; 
 
 #if UTF8_SDL2_ATLAS
-	// 外部Atlas が利用可能かの確認
-	UTF8SignManager::getInstance()->loadGrimoire();
+	// 外部Atlasが利用可能かの確認（先ほど大掃除した空文字列引数仕様へ完全対応！）
+	UTF8SignManager::getInstance()->loadGrimoire("");
 #endif
-*/
+
 	return true;
 }
-/*
-bool render_to_buffer(uint32_t code, unsigned char* dest, int dest_w, int dest_h, bool antialias, unsigned int font_size, unsigned int baseline) 
-{
-	if (!ft_face) return false;
 
-	// 1. AAの有無でロードモードを変える
-	// FT_LOAD_MONOCHROME はパキパキのドット絵モード
-	FT_Int32 load_flags = antialias ? FT_LOAD_RENDER : (FT_LOAD_TARGET_MONO | FT_LOAD_RENDER);
-	
-	if (FT_Load_Char(ft_face, code, load_flags))
-		return false;
-
-	// FreeTypeから歩幅（64分分1ピクセル単位）を奪い取って、ピクセル単位に直す
-	last_char_advance = ft_face->glyph->advance.x >> 6;
-
-	// もし advance が 0 なら、最低限の幅を無理やり入れる（保険）
-	if (last_char_advance == 0) {
-		last_char_advance = (code <= 0xFF) ? 6 : 12;
-	}
-
-	FT_Bitmap &bitmap = ft_face->glyph->bitmap;
-
-	// 2. 転写ロジック
-	int start_y = (int)baseline - ft_face->glyph->bitmap_top;
-	int start_x = ft_face->glyph->bitmap_left;
-
-	for (int y = 0; y < (int)bitmap.rows; y++) {
-		for (int x = 0; x < (int)bitmap.width; x++) {
-			int ty = start_y + y;
-			int tx = start_x + x;
-
-			if (tx < 0 || tx >= dest_w || ty < 0 || ty >= dest_h) continue;
-
-			unsigned char alpha = 0;
-			if (antialias) {
-				// グレー階調をそのままアルファに
-				alpha = bitmap.buffer[y * bitmap.pitch + x];
-			} else {
-				// MONOCHROMEモードは1ビットずつデータが入っているので解析が必要
-				unsigned char byte = bitmap.buffer[y * bitmap.pitch + (x >> 3)];
-				alpha = (byte & (0x80 >> (x & 7))) ? 255 : 0;
-			}
-
-			if (alpha == 0) continue;
-
-			int idx = (ty * dest_w + tx) * 4;
-			dest[idx + 0] = 0; // R
-			dest[idx + 1] = 0; // G
-			dest[idx + 2] = 0; // B
-			dest[idx + 3] = alpha;
-		}
-	}
-	return true;
-}
-*/
 void cleanup()
 {
 	if (ft_face) {
@@ -220,6 +121,10 @@ void cleanup()
 		FT_Done_FreeType(ft_library);
 		ft_library = nullptr;
 	}
+	s_last_owner = "";
+	s_last_path  = "";
+	s_last_size  = 0;
+	s_last_index = -1;
 	SDL_Quit();
 }
 

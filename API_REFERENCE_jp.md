@@ -37,10 +37,13 @@
 
 ## Cache Statistics
 
-* minetest.utf8sign.st.get_page_cache(): [ST専用] 旧Atlasのキャッシュページ数を返します。
+* minetest.utf8sign.st.get_page_cache(): [ST専用] 標準Atlasのキャッシュページ数を返します。
+* minetest.utf8sign.st.set_cache_size(): [ST専用] 標準Atlasのキャッシュページ数を設定します。
 
-* minetest.utf8sign.ex.get_char_cache(): [EX専用] 現在のEX版グリフキャッシュ数を返します。
-* minetest.utf8sign.ex.get_page_cache(): [EX専用] ロード済みのAtlasページ（画像）数を返します。
+* minetest.utf8sign.ex.get_cache_size(): [EX専用] 現在のキャッシュ上限設定を返します。
+* minetest.utf8sign.ex.get_cache_count(): [EX専用] 現在キャッシュしているGlyph/Pageを返します。
+* minetest.utf8sign.ex.set_cache_size(c,p): [EX専用] キャッシュ上限を更新します。
+* minetest.utf8sign.ex.clear_cache(c,p): [EX専用] キャッシュを強制消去します。
 
 * minetest.utf8sign.ft.get_cache_size(): [FT専用] 現在のキャッシュ上限設定を返します。
 * minetest.utf8sign.ft.get_cache_count(): [FT専用] 現在メモリにあるFreeTypeグリフ数を返します。
@@ -60,7 +63,8 @@ luanti.exe からの相対パスが使用可能です。
 [EX専用] Extended Atlasの一次キャッシュ（切り出し済み文字データ）の最大保持数を設定します。
 * utf8_ex_page_cache = 4
 [EX専用] Extended Atlasの二次キャッシュ（ロード済みのページ画像ファイル）の最大保持数を設定します。
-
+* utf8_ex_atlas_config
+[EX専用] Extended Atlasのフォールバック用設定ファイル(.json)を指定します。
 ## FreeType Engine (FT) Settings
 
 * utf8_font_path = ../fonts/NotoSansCJKjp-Regular.otf

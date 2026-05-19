@@ -95,7 +95,7 @@ void UTF8SignManager::loadGrimoire(const std::string &override_path)
 
 	// 引数がない場合は、これまでの minetest.conf 経由のパスを作る
 	if (grimoire_path.empty()) {
-		std::string grimoire_name = g_settings->get("utf8_atlas_config");
+		std::string grimoire_name = g_settings->get("utf8_ex_atlas_config");
 		if (grimoire_name.empty()) return;
 		grimoire_path = std::string(porting::path_share) + DIR_DELIM + "fonts" + DIR_DELIM + grimoire_name;
 	}
@@ -210,12 +210,12 @@ UTF8SignManager::UTF8SignManager() {
 
 	// --- SDL2イメージ・インフラの初期化 (一回だけ実行) ---
 #if (UTF8_SDL2_ATLAS || UTF8_SDL2_FREETYPE)
-    int flags = IMG_INIT_PNG | IMG_INIT_JPG; // PNGとJPGを有効化
-    if ((IMG_Init(flags) & flags) != flags) {
-        errorstream << "UTF8SignManager: SDL_image initialization failed! " << IMG_GetError() << std::endl;
-    } else {
-        actionstream << "UTF8SignManager: SDL_image (PNG/JPG) ready." << std::endl;
-    }
+	int flags = IMG_INIT_PNG | IMG_INIT_JPG; // PNGとJPGを有効化
+	if ((IMG_Init(flags) & flags) != flags) {
+		errorstream << "UTF8SignManager: SDL_image initialization failed! " << IMG_GetError() << std::endl;
+	} else {
+		actionstream << "UTF8SignManager: SDL_image (PNG/JPG) ready." << std::endl;
+	}
 #endif
 
 #if UTF8_ATLAS
@@ -230,10 +230,9 @@ UTF8SignManager::UTF8SignManager() {
 		}
 	}
 
-//	actionstream << "UTF8SignManager: Atlas Path: " 
-//		<< st_atlas.st_atlas_path << std::endl;
 	actionstream << "UTF8SignManager: ST Font cache initialized with page: " 
 		<< st.st_page_cache << std::endl;
+	UTF8FontAtlas::setMaxCacheSizeSt(st.st_page_cache);
 #endif
 
 #if UTF8_SDL2_ATLAS
@@ -259,6 +258,7 @@ UTF8SignManager::UTF8SignManager() {
 
 	actionstream << "UTF8SignManager: EX Font cache initialized with size: " 
 		<< ex.ex_char_cache << " / page: " << ex.ex_page_cache << std::endl;
+	UTF8FontAtlas::setMaxCacheSizeEx(ex.ex_char_cache, ex.ex_page_cache);
 #endif
 
 #if UTF8_SDL2_FREETYPE
@@ -274,6 +274,7 @@ UTF8SignManager::UTF8SignManager() {
 
 	actionstream << "UTF8SignManager: FT Font cache initialized with size: " 
 		<< ft.cache_size << std::endl;
+	UTF8FontEngine::setMaxCacheSize(ft.cache_size);
 #endif
 }
 
@@ -286,41 +287,7 @@ int l_set_config(lua_State *L) {
 	auto &mgr = *UTF8SignManager::getInstance();
 
 #if UTF8_ATLAS
-	/*
-	lua_getfield(L, 1, "st_atlas");
-	if (lua_istable(L, -1)) {
-		lua_getfield(L, -1, "st_sign_width");
-		if (!lua_isnil(L, -1)) { // 型チェック関数を使う
-			warningstream << "l_utf8sign: 'st_sign_width' in set_config is DEPRECATED and ignored. "
-				<< "The width is now automatically determined by the texture spec "
-				<< "(e.g., [utf8combine:WIDTHxHEIGHT:...)." << std::endl;
-		}
-		lua_pop(L, 1);
-		mgr.st_atlas.st_char_w_han   = getintfield_default(L, -1, "st_char_w_han",   mgr.st_atlas.st_char_w_han);
-		mgr.st_atlas.st_char_w_zen   = getintfield_default(L, -1, "st_char_w_zen",   mgr.st_atlas.st_char_w_zen);
-		mgr.st_atlas.st_line_height  = getintfield_default(L, -1, "st_line_height",  mgr.st_atlas.st_line_height);
-		lua_getfield(L, -1, "st_padding_x");
-		if (!lua_isnil(L, -1)) {
-			warningstream << "l_utf8sign: 'st_padding_x' in set_config is ignored. "
-			<< "Specify combine position in texture string (e.g., :x,y@401400) instead." << std::endl;
-		}
-		lua_pop(L, 1);
-		lua_getfield(L, -1, "st_padding_y");
-		if (!lua_isnil(L, -1)) {
-			warningstream << "l_utf8sign: 'st_padding_y' in set_config is ignored. "
-			<< "Specify combine position in texture string (e.g., :x,y@401400) instead." << std::endl;
-		}
-		lua_pop(L, 1);
-		mgr.st_atlas.st_max_lines = getintfield_default(L, -1, "st_max_lines", mgr.st_atlas.st_max_lines);
-		lua_getfield(L, -1, "st_atlas_path");
-		if (lua_isstring(L, -1)) {
-			mgr.st_atlas.st_atlas_path = lua_tostring(L, -1);
-		}
-		lua_pop(L, 1);
-	}
-	lua_pop(L, 1);
-	*/
-	// 2. st_atlas グループの取得（Luaから直通）
+	//  st_atlas グループの取得（Luaから直通）
 	lua_getfield(L, 1, "st");
 	if (lua_istable(L, -1)) {
 		mgr.st.st_char_w_han   = getintfield_default(L, -1, "st_char_w_han",   mgr.st.st_char_w_han);
@@ -630,11 +597,23 @@ int l_get_config(lua_State *L) {
 }
 
 #if UTF8_ATLAS
-//  Cache 使用量 表示
+//  Page Cache 使用量/最大 表示
 int l_st_get_page_cache(lua_State *L) {
-	lua_pushinteger(L, UTF8FontAtlas::getPageCache());
-	return 1;
+	u32 st_page_count = 0, st_page_size = 0;
+	UTF8FontAtlas::getPageCacheSt(st_page_count, st_page_size); 
+
+	lua_pushinteger(L, st_page_count);
+	lua_pushinteger(L, st_page_size);
+	return 2;
 }
+	int l_st_set_cache_size(lua_State *L) {
+	u32 new_page_size = (u32)luaL_checkinteger(L, 1);
+
+	UTF8SignManager::getInstance()->st.st_page_cache = new_page_size;
+	UTF8FontAtlas::setMaxCacheSizeSt(new_page_size);
+	return 0;
+}
+
 #endif
 
 #if UTF8_SDL2_ATLAS
@@ -678,43 +657,72 @@ int l_ex_get_atlas_status(lua_State *L) {
 	return 1;
 }
 
-//  Char Cache 使用量
-int l_ex_get_char_cache(lua_State *L) {
-	lua_pushinteger(L, UTF8FontAtlas::getCharCacheEx());
-	return 1;
-}
+//  EX Cache Max
+int l_ex_get_cache_size(lua_State *L) {
+	u32 ex_char_size = 0, ex_page_size = 0;
+	UTF8FontAtlas::getMaxCacheSizeEx(ex_char_size, ex_page_size); 
 
-//  Cache_sizeの現在の設定値確認
-int l_ex_get_page_cache(lua_State *L) {
-	lua_pushinteger(L, UTF8FontAtlas::getPageCacheEx());
-	return 1;
+	lua_pushinteger(L, ex_char_size);
+	lua_pushinteger(L, ex_page_size);
+	return 2;
+}
+//  EX Cache Count現在の使用量
+int l_ex_get_cache_count(lua_State *L) {
+	u32 ex_char_count = 0, ex_page_count = 0;
+	UTF8FontAtlas::getCacheCountEx(ex_char_count, ex_page_count); 
+	
+	lua_pushinteger(L, ex_char_count);
+	lua_pushinteger(L, ex_page_count);
+	return 2;
+}
+//  EX set cache limit
+int l_ex_set_cache_size(lua_State *L) {
+	u32 new_char_size = (u32)luaL_checkinteger(L, 1);
+	u32 new_page_size = (u32)luaL_checkinteger(L, 2);
+
+	UTF8SignManager::getInstance()->ex.ex_char_cache = new_char_size;
+	UTF8SignManager::getInstance()->ex.ex_page_cache = new_page_size;
+	UTF8FontAtlas::setMaxCacheSizeEx(new_char_size, new_page_size);
+	return 0;
+}
+//  EX clear cache
+int l_ex_clear_cache(lua_State *L) {
+	bool c_flag = lua_toboolean(L, 1);
+	bool p_flag = lua_toboolean(L, 2);
+
+	UTF8FontAtlas::clearCacheEx(c_flag, p_flag);
+	return 0;
 }
 #endif
 
 #if UTF8_SDL2_FREETYPE
-//  Cache 使用量
+//  Cache_sizeの現在の設定値確認 (Lua側: local max = minetest.utf8sign.ft_get_cache_size())
+int l_ft_get_cache_size(lua_State *L) {
+	u32 size = UTF8FontEngine::getMaxCacheSize();
+	lua_pushinteger(L, size);
+	return 1;
+}
+
+//  Cache 使用量 (Lua側: local count = minetest.utf8sign.ft_get_cache_count())
 int l_ft_get_cache_count(lua_State *L) {
 	lua_pushinteger(L, UTF8FontEngine::getCacheCount());
 	return 1;
 }
 
-//  Cache_sizeの現在の設定値確認
-int l_ft_get_cache_size(lua_State *L) {
-	u32 size = UTF8SignManager::getInstance()->ft.cache_size;
-	lua_pushinteger(L, size);
-	return 1;
-}
-
-//  Cache_sizeの大きさ変更（上限2048）
+//  Cache_sizeの大きさ変更（上限2048） (Lua側: minetest.utf8sign.ft_set_cache_size(512))
 int l_ft_set_cache_size(lua_State *L) {
 	u32 new_size = (u32)luaL_checkinteger(L, 1);
-	if (new_size > 2048) new_size = 2048; // ★防波堤
+	if (new_size > 2048) new_size = 2048; //  防波堤
 
+	// A. 司令塔（Manager）の脳内設定を上書き更新
 	UTF8SignManager::getInstance()->ft.cache_size = new_size;
+	// B. 現場（実体）に対しても、新しい上限サイズを即座に叩き込んで完全同期！
+	UTF8FontEngine::setMaxCacheSize(new_size);
+
 	return 0;
 }
 
-//  Cacheの消去
+//  Cacheの消去 (Lua側: minetest.utf8sign.ft_clear_cache())
 int l_ft_clear_cache(lua_State *L) {
 	UTF8FontEngine::clearCache();
 	return 0;
@@ -754,6 +762,8 @@ void Initialize(lua_State *L, int top) {
 	lua_newtable(L);
 	lua_pushcfunction(L, l_st_get_page_cache);
 	lua_setfield(L, -2, "get_page_cache");
+	lua_pushcfunction(L, l_st_set_cache_size);
+	lua_setfield(L, -2, "set_cache_size");
 	lua_setfield(L, -2, "st");
 #endif
 
@@ -764,20 +774,24 @@ void Initialize(lua_State *L, int top) {
 	lua_setfield(L, -2, "load_atlas_config");
 	lua_pushcfunction(L, l_ex_get_atlas_status);
 	lua_setfield(L, -2, "get_atlas_status");
-	lua_pushcfunction(L, l_ex_get_char_cache);
-	lua_setfield(L, -2, "get_char_cache");
-	lua_pushcfunction(L, l_ex_get_page_cache);
-	lua_setfield(L, -2, "get_page_cache");
+	lua_pushcfunction(L, l_ex_get_cache_size);
+	lua_setfield(L, -2, "get_cache_size");
+	lua_pushcfunction(L, l_ex_get_cache_count);
+	lua_setfield(L, -2, "get_cache_count");
+	lua_pushcfunction(L, l_ex_set_cache_size);
+	lua_setfield(L, -2, "set_cache_size");
+	lua_pushcfunction(L, l_ex_clear_cache);
+	lua_setfield(L, -2, "clear_cache");
 	lua_setfield(L, -2, "ex");
 #endif
 
 #if UTF8_SDL2_FREETYPE
 	// --- minetest.utf8sign.ft サブテーブル ---
 	lua_newtable(L); 
-	lua_pushcfunction(L, l_ft_get_cache_count);
-	lua_setfield(L, -2, "get_cache_count");
 	lua_pushcfunction(L, l_ft_get_cache_size);
 	lua_setfield(L, -2, "get_cache_size");
+	lua_pushcfunction(L, l_ft_get_cache_count);
+	lua_setfield(L, -2, "get_cache_count");
 	lua_pushcfunction(L, l_ft_set_cache_size);
 	lua_setfield(L, -2, "set_cache_size");
 	lua_pushcfunction(L, l_ft_clear_cache);

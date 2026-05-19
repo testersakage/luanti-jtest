@@ -23,7 +23,7 @@ if minetest.utf8sign then
 			st_char_w_zen = 16,
 			st_line_height = 16,
 			st_max_lines = 4,
-			st_atlas_path = modpath .. "/textures/signs_lib_uni%02x.png",
+			st_atlas_path = modpath .. "/textures/unifont/signs_lib_uni%02x.png",
 			st_grid_columns = 16,
 			st_grid_size = 16,
 			st_alpha_reverse = true,
