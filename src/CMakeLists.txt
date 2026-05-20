@@ -511,6 +511,8 @@ set(common_SRCS
 	${mapgen_SRCS}
 	${server_network_SRCS}
 	utf8_53.cpp
+	mcl/core/tga_encoder.cpp
+#	mcl/core/tga_encoder.h
 )
 
 if(ANDROID)

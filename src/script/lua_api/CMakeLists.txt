@@ -26,6 +26,7 @@ set(common_SCRIPT_LUA_API_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/l_server.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_utf8_53_server.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_utf8_sign_server.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_mcl_core_server.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_settings.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_storage.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_util.cpp
@@ -47,4 +48,5 @@ set(client_SCRIPT_LUA_API_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/l_storage.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_utf8_53_client.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_utf8_sign_client.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_mcl_core_client.cpp
 	PARENT_SCOPE)

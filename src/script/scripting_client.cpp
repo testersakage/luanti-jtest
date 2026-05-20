@@ -24,6 +24,7 @@
 #include "lua_api/l_client_sound.h"
 #include "lua_api/l_utf8_53_client.h"  // ★追加 API のヘッダ
 #include "lua_api/l_utf8_sign_client.h"  // ★追加 API のヘッダ
+#include "lua_api/l_mcl_core_client.h"  // ★追加 API のヘッダ
 
 ClientScripting::ClientScripting(Client *client):
 	ScriptApiBase(ScriptingType::Client)
@@ -75,8 +76,9 @@ void ClientScripting::InitializeModApi(lua_State *L, int top)
 	ModApiParticlesLocal::Initialize(L, top);
 	ModApiClientSound::Initialize(L, top);
 
-	LuaUTF8Client::Initialize(L, top);  // ★ここに追加
-	l_utf8_sign_client::Initialize(L, top);  // ★ここに追加
+	LuaUTF8Client::Initialize(L, top);  // UTF-8wrap 追加
+	l_utf8_sign_client::Initialize(L, top);  // Sign 追加
+	l_mcl_core_client::Initialize(L, top); // MCL CORE 追加
 }
 
 void ClientScripting::on_client_ready(LocalPlayer *localplayer)

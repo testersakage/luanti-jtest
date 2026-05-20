@@ -36,6 +36,7 @@
 #include "lua_api/l_utf8_53_client.h"
 #include "lua_api/l_utf8_53_server.h" // 追加
 #include "lua_api/l_utf8_sign_server.h" // 追加
+#include "lua_api/l_mcl_core_server.h" // 追加
 
 extern "C" {
 #include <lualib.h>
@@ -160,9 +161,10 @@ void ServerScripting::InitializeModApi(lua_State *L, int top)
 	ModApiStorage::Initialize(L, top);
 	ModApiChannels::Initialize(L, top);
 	ModApiIPC::Initialize(L, top);
-	LuaUTF8::Initialize(L, top); // 追加
-	LuaUTF8Client::Initialize(L, top); // 追加
-	l_utf8_sign_server::Initialize(L, top); // 追加
+	LuaUTF8::Initialize(L, top); // UTF-8 追加
+	LuaUTF8Client::Initialize(L, top); // UTF-8wrap 追加
+	l_utf8_sign_server::Initialize(L, top); // Sign 追加
+	l_mcl_core_server::Initialize(L, top); // MCL CORE 追加
 
 }
 
