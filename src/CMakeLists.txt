@@ -511,8 +511,16 @@ set(common_SRCS
 	${mapgen_SRCS}
 	${server_network_SRCS}
 	utf8_53.cpp
+	mcl/stacktrace.cpp
 	mcl/core/tga_encoder.cpp
 #	mcl/core/tga_encoder.h
+	mcl/core/util_item.cpp
+	mcl/core/util_misc.cpp
+	mcl/core/util_object.cpp
+	mcl/core/util_queue.cpp
+	mcl/core/util_ringbuffer.cpp
+	mcl/core/util_shape.cpp
+#	mcl/core/util_table.cpp
 )
 
 if(ANDROID)
