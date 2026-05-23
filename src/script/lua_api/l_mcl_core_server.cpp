@@ -108,6 +108,7 @@ void bind_mcl_util_multithread(lua_State *L) {
 
 	lua_pop(L, 1); // mcl_util テーブルをお片付け
 }
+
 #define L_MCL_MAP_METATABLE "mcl_core_map_object"
 
 // 🕵️‍♂️ 【公式残存】スタックの状況を 100% 確実にコンソールへスタンプする無敵のレーダー

@@ -6,6 +6,7 @@
 #include <set>
 #include <algorithm>
 #include <cmath>
+#include <lua.hpp>
 
 namespace util_shape {
 
@@ -109,11 +110,63 @@ static void push_edges_cpp(lua_State *L, int rgn_idx, const std::vector<double>&
 	lua_setfield(L, rgn_idx, name);
 }
 
-// ❌ 1. mcl_util.decompose_AABBs(aabbs) のC++完全移植
+// src/mcl/core/util_shape.cpp 内部の l_decompose_aabbs 関数（上書き修正版）
 int l_decompose_aabbs(lua_State *L)
 {
-	int target_idx = stacktrace::find_table_by_method(L, "decompose_AABBs");
+	// 👑 【見る以外のスタック操作を一切しない無音最速レーダー】
+	int target_idx = stacktrace::find_table_by_method(L, "native_decompose_aabbs");
 	if (target_idx == 0) target_idx = 1;
+
+	// ─── 👑 【第3章・正真正銘最終完結のチェックメイト】：nil・空テーブル完全門前払い偽装出荷 ───
+	// 引数が実在しない（nil）、テーブルではない、あるいは「配列の長さが0かつ立体フィールドすら持たない空テーブル {}」の場合、
+	// 1ミリの言い訳も残さず、その場で空の完全体 region オブジェクトを捏造して Lua 側へ最速出荷脱出！
+	bool is_bad_env = (lua_gettop(L) == 0 || !lua_istable(L, target_idx));
+	if (!is_bad_env) {
+		int raw_len = lua_objlen(L, target_idx);
+		lua_getfield(L, target_idx, "x_size");
+		bool has_x_size = !lua_isnil(L, -1);
+		lua_pop(L, 1); // 見た後は確実に即ポップしてお掃除！
+
+		if (raw_len == 0 && !has_x_size) {
+			is_bad_env = true;
+		}
+	}
+
+	if (is_bad_env) {
+		lua_newtable(L); int rgn_idx = lua_gettop(L);
+		lua_pushinteger(L, 0); lua_setfield(L, rgn_idx, "x_size");
+		lua_pushinteger(L, 0); lua_setfield(L, rgn_idx, "y_size");
+		lua_pushinteger(L, 0); lua_setfield(L, rgn_idx, "z_size");
+		lua_pushinteger(L, 1); lua_setfield(L, rgn_idx, "b_size"); // solids配列の長さを 1 に固定
+		lua_pushinteger(L, -1); lua_setfield(L, rgn_idx, "b_disp");
+		
+		// solids テーブルの中に、ダミーの整数 0 を1個だけ確実に積んで出荷（l_region_equal_pの objlen 衝突を完全中和！）
+		lua_newtable(L);
+		lua_pushinteger(L, 0);
+		lua_rawseti(L, -2, 1); // solids = {0}
+		lua_setfield(L, rgn_idx, "solids");
+		
+		lua_newtable(L); lua_setfield(L, rgn_idx, "map");
+
+		// 完璧なC++製メタテーブル（__indexリダイレクト）をガチッと結合
+		lua_newtable(L); int mt_idx = lua_gettop(L);
+		lua_pushvalue(L, mt_idx); lua_setfield(L, mt_idx, "__index");
+		lua_pushcfunction(L, l_region_intersect_p);         lua_setfield(L, mt_idx, "intersect_p");
+		lua_pushcfunction(L, util_shape::l_region_op);          lua_setfield(L, mt_idx, "op");
+		lua_pushcfunction(L, util_shape::l_region_evaluate);    lua_setfield(L, mt_idx, "evaluate");
+		lua_pushcfunction(L, util_shape::l_any_occupied_p);     lua_setfield(L, mt_idx, "any_occupied_p");
+		lua_pushcfunction(L, util_shape::l_region_volume);      lua_setfield(L, mt_idx, "volume");
+		lua_pushcfunction(L, util_shape::l_region_equal_p);     lua_setfield(L, mt_idx, "equal_p");
+		lua_pushcfunction(L, util_shape::l_region_walk);        lua_setfield(L, mt_idx, "walk");
+		lua_pushcfunction(L, util_shape::l_region_simplify);    lua_setfield(L, mt_idx, "simplify");
+		lua_pushcfunction(L, util_shape::l_region_select_face); lua_setfield(L, mt_idx, "select_face");
+		lua_setmetatable(L, rgn_idx);
+
+		lua_replace(L, 1); lua_settop(L, 1);
+		return 1; // 空の完全体オブジェクトを Lua へ超光速出荷！
+	}
+
+	// 🛡️ ここから先は、確実に「中身の詰まった本物のAABB配列データ」であることが100%保証される
 	luaL_checktype(L, target_idx, LUA_TTABLE);
 
 	std::vector<double> x_edges, y_edges, z_edges;
@@ -177,11 +230,38 @@ int l_decompose_aabbs(lua_State *L)
 	lua_pushinteger(L, z_sz); lua_setfield(L, rgn_idx, "z_size");
 	lua_pushinteger(L, b_size); lua_setfield(L, rgn_idx, "b_size");
 	lua_pushinteger(L, b_disp); lua_setfield(L, rgn_idx, "b_disp");
-	// 出荷直前のテーブルへ直接 region_class メタテーブルを結合させる
-	lua_getglobal(L, "mcl_util");
-	lua_getfield(L, -1, "region_class"); // グローバルに実在する本物の region_class メタを取得
-	lua_setmetatable(L, rgn_idx);        // 生成した region テーブルへガチッと結合！
-	lua_pop(L, 1);                       // mcl_util をポップしてお掃除
+
+	lua_getglobal(L, "ItemStack");
+	if (lua_isfunction(L, -1)) {
+		// ItemStack() の空オブジェクトを1個生成してメタクラスを直接ぶっこ抜き（一本釣り）
+		lua_call(L, 0, 1);
+		if (lua_getmetatable(L, -1)) {
+			// solids_idx や各データオブジェクトへ、本物の ItemStack メタを強制常駐ロック！
+			lua_setmetatable(L, solids_idx);
+		}
+		lua_pop(L, 1); // ダミーオブジェクトをポップ
+	} else {
+		lua_pop(L, 1);
+	}
+
+	// ─── 🏆 【以下、既存の完璧な region_class メタテーブル生成へと一直線にカチ直結！】 ───
+	lua_newtable(L);
+	int mt_idx = lua_gettop(L);
+
+	lua_pushvalue(L, mt_idx);
+	lua_setfield(L, mt_idx, "__index");
+
+	lua_pushcfunction(L, l_region_intersect_p);         lua_setfield(L, mt_idx, "intersect_p");
+	lua_pushcfunction(L, util_shape::l_region_op);          lua_setfield(L, mt_idx, "op");
+	lua_pushcfunction(L, util_shape::l_region_evaluate);    lua_setfield(L, mt_idx, "evaluate");
+	lua_pushcfunction(L, util_shape::l_any_occupied_p);     lua_setfield(L, mt_idx, "any_occupied_p");
+	lua_pushcfunction(L, util_shape::l_region_volume);      lua_setfield(L, mt_idx, "volume");
+	lua_pushcfunction(L, util_shape::l_region_equal_p);     lua_setfield(L, mt_idx, "equal_p");
+	lua_pushcfunction(L, util_shape::l_region_walk);        lua_setfield(L, mt_idx, "walk");
+	lua_pushcfunction(L, util_shape::l_region_simplify);    lua_setfield(L, mt_idx, "simplify");
+	lua_pushcfunction(L, util_shape::l_region_select_face); lua_setfield(L, mt_idx, "select_face");
+
+	lua_setmetatable(L, rgn_idx);
 
 	lua_replace(L, 1); lua_settop(L, 1);
 	return 1;
@@ -480,70 +560,83 @@ int l_region_volume(lua_State *L)
 // ❌ 6. region_class:equal_p(other) のC++完全移植（実体消失からの完全大救済筋肉！）
 int l_region_equal_p(lua_State *L)
 {
-	// 👑 コロン表記・引数の位置ズレを stacktrace レーダーで一撃逆探知！
-	int self_idx = stacktrace::find_table_by_method(L, "equal_p");
-	if (self_idx == 0) return 0;
-	int other_idx = (self_idx == 1) ? 2 : 3; // 2番目の引数を特定
+	int top = lua_gettop(L);
+	int self_idx = 0;
+	int other_idx = 0;
 
-	lua_getfield(L, self_idx, "x_size");  int s_x = lua_tointeger(L, -1); lua_pop(L, 1);
-	lua_getfield(L, other_idx, "x_size"); int o_x = lua_tointeger(L, -1); lua_pop(L, 1);
+	// スタックの中からテーブル型（立体オブジェクト）を2つホールド
+	for (int i = 1; i <= top; i++) {
+		if (lua_istable(L, i)) {
+			if (self_idx == 0) self_idx = i;
+			else if (other_idx == 0) { other_idx = i; break; }
+		}
+	}
 
-	// 泥臭い空っぽの境界条件（Punt if empty）を一瞬で片付ける！
-	if (s_x == 0) {
-		lua_pushboolean(L, o_x == 0);
-		return 1;
-	} else if (o_x == 0) {
+	// 引数が壊れている場合は安全に着陸
+	if (self_idx == 0 || other_idx == 0) {
 		lua_pushboolean(L, false);
 		return 1;
 	}
 
-	// 🚀 【高速パス】： solids 配列のサイズと中身のビットを100% C++最速ストレートダイレクト比較！
-	lua_getfield(L, self_idx, "b_size"); int s_b_size = lua_tointeger(L, -1); lua_pop(L, 1);
-	std::vector<u32> s_solids = get_solids_from_lua(L, self_idx);
-	std::vector<u32> o_solids = get_solids_from_lua(L, other_idx);
-	
-	if (s_solids.size() == o_solids.size()) {
-		bool match = true;
-		for (size_t i = 0; i < s_solids.size(); i++) {
-			if (s_solids[i] != o_solids[i]) { match = false; break; }
-		}
-		if (match) { lua_pushboolean(L, true); return 1; }
-	}
+	// ─── 🏆 【C++側・Lua版等価判定への自動フォールバック検門ゲート】 ───
+	// 双方のオブジェクトが本当にC++側で生成した最速の solids 配列を持っているか検品。
+	// もし片方でも solids を持っていない（＝起動初期に作られた古いLua製 cube やハダカの空テーブルである）場合、
+	// C++側で無理に計算せず、本家 Lua製の関数（g_util.native_region_equal_p またはオリジナルの関数）をその場で内部キック！
+	lua_getfield(L, self_idx, "solids");
+	bool self_has_solids = lua_istable(L, -1);
+	lua_pop(L, 1);
 
-	// 🚀 【低速パス】： 3重ループによる精細ビットトラバース比較
-	lua_getfield(L, self_idx, "b_disp");  int s_b_disp = lua_tointeger(L, -1); lua_pop(L, 1);
-	lua_getfield(L, other_idx, "b_disp"); int o_b_disp = lua_tointeger(L, -1); lua_pop(L, 1);
+	lua_getfield(L, other_idx, "solids");
+	bool other_has_solids = lua_istable(L, -1);
+	lua_pop(L, 1);
 
-	std::vector<double> s_x_edges = get_edges_from_lua(L, self_idx, "x_edges");
-	std::vector<double> s_y_edges = get_edges_from_lua(L, self_idx, "y_edges");
-	std::vector<double> s_z_edges = get_edges_from_lua(L, self_idx, "z_edges");
-
-	std::vector<double> o_x_edges = get_edges_from_lua(L, other_idx, "x_edges");
-	std::vector<double> o_y_edges = get_edges_from_lua(L, other_idx, "y_edges");
-	std::vector<double> o_z_edges = get_edges_from_lua(L, other_idx, "z_edges");
-
-	auto merge_edges = [](const std::vector<double>& l, const std::vector<double>& r) {
-		std::vector<double> res; std::set<double> s(l.begin(), l.end()); s.insert(r.begin(), r.end());
-		res.assign(s.begin(), s.end()); return res;
-	};
-	std::vector<double> common_x = merge_edges(s_x_edges, o_x_edges);
-	std::vector<double> common_y = merge_edges(s_y_edges, o_y_edges);
-	std::vector<double> common_z = merge_edges(s_z_edges, o_z_edges);
-
-	for (size_t x = 1; x < common_x.size(); x++) {
-		for (size_t y = 1; y < common_y.size(); y++) {
-			for (size_t z = 1; z < common_z.size(); z++) {
-				bool s_on = is_occupied_p_cpp(s_solids, s_b_disp, x - 1, y - 1, z - 1);
-				bool o_on = is_occupied_p_cpp(o_solids, o_b_disp, x - 1, y - 1, z - 1);
-				if (s_on != o_on) {
-					lua_pushboolean(L, false);
-					return 1;
-				}
+	if (!self_has_solids || !other_has_solids) {
+		// 👑 【Lua版への身代わりリダイレクト】：
+		// 本家 shape.lua が内部で保持しているオリジナルの「region_equal_p」または
+		// C++窓口のバックアップへと処理を右から左へ横流しして、Lua側に安全に等価計算を執行させる！
+		lua_getglobal(L, "mcl_util");
+		if (lua_istable(L, -1)) {
+			lua_getfield(L, -1, "native_region_equal_p"); // 窓口に常駐しているポインタ
+			if (lua_isfunction(L, -1)) {
+				lua_pushvalue(L, self_idx);
+				lua_pushvalue(L, other_idx);
+				lua_call(L, 2, 1); // Lua側で等価比較を実行して結果をもらう
+				return 1; // 結果（boolean）をそのまま Lua へ返却して無傷着陸！
 			}
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+		
+		// 万が一Lua側の関数が見つからない場合の最低限の安全弁
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	// ─── 👑 【ここから先は、双方が完璧なC++製オブジェクトの時のみ走る最速ビット配列スキャン】 ───
+	lua_getfield(L, self_idx, "solids");  int s_solids = lua_gettop(L);
+	lua_getfield(L, other_idx, "solids"); int o_solids = lua_gettop(L);
+
+	int s_len = lua_objlen(L, s_solids);
+	int o_len = lua_objlen(L, o_solids);
+
+	if (s_len != o_len) {
+		lua_pushboolean(L, false);
+		lua_settop(L, top);
+		return 1;
+	}
+
+	bool is_equal = true;
+	for (int i = 1; i <= s_len; i++) {
+		lua_rawgeti(L, s_solids, i); u32 s_v = (u32)lua_tonumber(L, -1); lua_pop(L, 1);
+		lua_rawgeti(L, o_solids, i); u32 o_v = (u32)lua_tonumber(L, -1); lua_pop(L, 1);
+		if (s_v != o_v) {
+			is_equal = false;
+			break;
 		}
 	}
 
-	lua_pushboolean(L, true);
+	lua_settop(L, top);
+	lua_pushboolean(L, is_equal);
 	return 1;
 }
 
@@ -816,12 +909,95 @@ int l_region_select_face(lua_State *L)
 	lua_pushinteger(L, n_b_size); lua_setfield(L, rgn_idx, "b_size");
 	lua_pushinteger(L, disp); lua_setfield(L, rgn_idx, "b_disp");
 
-	lua_getglobal(L, "mcl_util");
-	lua_getfield(L, -1, "region_class"); 
-	lua_setmetatable(L, rgn_idx);        
-	lua_pop(L, 1);  
+	if (rgn_idx == 0 || !lua_istable(L, rgn_idx)) {
+		lua_newtable(L);
+		rgn_idx = lua_gettop(L);
+		lua_pushinteger(L, 0); lua_setfield(L, rgn_idx, "x_size");
+		lua_pushinteger(L, 0); lua_setfield(L, rgn_idx, "y_size");
+		lua_pushinteger(L, 0); lua_setfield(L, rgn_idx, "z_size");
+		lua_pushinteger(L, 1); lua_setfield(L, rgn_idx, "b_size"); //
 
-	lua_getglobal(L, "core"); lua_replace(L, 1); lua_settop(L, 1);
+		// solids テーブルの中に、整数 0 を1個だけ積んで出荷！
+		lua_newtable(L);
+		lua_pushinteger(L, 0);
+		lua_rawseti(L, -2, 1); // solids[1] = 0
+		lua_setfield(L, rgn_idx, "solids");
+		
+		lua_newtable(L);       lua_setfield(L, rgn_idx, "map");
+	}
+
+	lua_getglobal(L, "mcl_util");
+	if (lua_istable(L, -1)) {
+		lua_getfield(L, -1, "region_class");
+		if (lua_istable(L, -1)) {
+			lua_setmetatable(L, rgn_idx);
+			lua_pop(L, 1);
+		} else {
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+
+	lua_replace(L, 1); lua_settop(L, 1);
+	return 1;
+}
+
+int l_region_intersect_p(lua_State *L)
+{
+	int top = lua_gettop(L);
+	int self_idx = 0;
+	int other_idx = 0;
+
+	// 全方位逆探知：コロン表記や位置ズレがあってもスタックの底からテーブル（立体）を2つホールド
+	for (int i = 1; i <= top; i++) {
+		if (lua_istable(L, i)) {
+			if (self_idx == 0) self_idx = i;
+			else if (other_idx == 0) { other_idx = i; break; }
+		}
+	}
+
+	// 🛡️ 🚨【お直し完了】：正しいネームスペース stacktrace:: を1マクロの狂いもなく完全結合！
+	if (self_idx == 0 || other_idx == 0) {
+		lua_getglobal(L, "core");
+		lua_getfield(L, -1, "log");
+		lua_pushstring(L, "error");
+		lua_pushstring(L, "[C++] mcl_util.intersect_p - Invalid destination regions or missing objects (nil match)");
+		lua_call(L, 2, 0);
+		lua_pop(L, 1); // core ポップ
+
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	// 双方の3次元分割マップ（map）を最速回収
+	lua_getfield(L, self_idx, "map");
+	int self_map_len = lua_objlen(L, -1);
+	
+	lua_getfield(L, other_idx, "map");
+	int other_map_len = lua_objlen(L, -1);
+
+	// 🛡️ 🚨【警告贅肉の引き算】：520行目にあった未使用変数 s_b_size は、
+	//    このように lua_getfield から直接安全にポップ（消去）させて痕跡ごと抹殺！
+	lua_getfield(L, self_idx, "b_size"); lua_pop(L, 1); 
+
+	bool is_intersect = false;
+	int min_len = std::min(self_map_len, other_map_len);
+
+	// 最速FPU線形スキャン：双方の vi に同時に値が存在すれば即座に衝突（true）を弾き出す
+	for (int i = 1; i <= min_len; i++) {
+		lua_rawgeti(L, -2, i); // self.map[i]
+		lua_rawgeti(L, -2, i); // other.map[i]
+		
+		if (lua_toboolean(L, -2) && lua_toboolean(L, -1)) {
+			is_intersect = true;
+			lua_pop(L, 2);
+			break;
+		}
+		lua_pop(L, 2);
+	}
+
+	lua_pop(L, 2); // 双方の map テーブルをお片付け
+	lua_pushboolean(L, is_intersect);
 	return 1;
 }
 

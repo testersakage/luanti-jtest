@@ -9,6 +9,7 @@ set(mcl_core_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/util_queue.cpp  # 
 	${CMAKE_CURRENT_SOURCE_DIR}/util_ringbuffer.cpp  # 
 	${CMAKE_CURRENT_SOURCE_DIR}/util_shape.cpp  # 
-#	${CMAKE_CURRENT_SOURCE_DIR}/util_table.cpp  # 凍結
+	${CMAKE_CURRENT_SOURCE_DIR}/util_table.cpp  # 
+	${CMAKE_CURRENT_SOURCE_DIR}/world.cpp  # 
 	PARENT_SCOPE
 )

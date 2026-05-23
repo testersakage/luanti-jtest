@@ -75,22 +75,35 @@ void bind_mcl_util_muscles(lua_State *L) {
 	lua_pushcfunction(L, util_ringbuffer::l_rb_insert_if_not_exists); lua_setfield(L, -2, "native_rb_insert_if_not_exists");
 	lua_pushcfunction(L, util_ringbuffer::l_rb_serialize);            lua_setfield(L, -2, "native_rb_serialize");
 
+	lua_pop(L, 1); // mcl_util テーブルをお片付け
+}
+
+void bind_mcl_util_multithread(lua_State *L) {
+	lua_getglobal(L, "mcl_util");
+	if (!lua_istable(L, -1)) {
+		lua_pop(L, 1);
+		lua_newtable(L); 
+		lua_pushvalue(L, -1);
+		lua_setglobal(L, "mcl_util"); // _G.mcl_util = {} を最初から一発創世！
+	}
+	int util_idx = lua_gettop(L); // 基準となるテーブルの部屋番号を固定
+
 	// shape.lua  4? function / 10 porting lua to c++
-	lua_pushcfunction(L, util_shape::l_decompose_aabbs);       lua_setfield(L, -2, "native_decompose_aabbs");
-	lua_pushcfunction(L, util_shape::l_region_op);             lua_setfield(L, -2, "native_region_op");
-	lua_pushcfunction(L, util_shape::l_region_evaluate);       lua_setfield(L, -2, "native_region_evaluate");
-	lua_pushcfunction(L, util_shape::l_any_occupied_p);        lua_setfield(L, -2, "native_any_occupied_p");
-	lua_pushcfunction(L, util_shape::l_region_volume);         lua_setfield(L, -2, "native_region_volume");
-	lua_pushcfunction(L, util_shape::l_region_equal_p);        lua_setfield(L, -2, "native_region_equal_p");
-	lua_pushcfunction(L, util_shape::l_region_walk);           lua_setfield(L, -2, "native_region_walk");
-	lua_pushcfunction(L, util_shape::l_region_simplify);       lua_setfield(L, -2, "native_region_simplify");
-	lua_pushcfunction(L, util_shape::l_region_select_face);    lua_setfield(L, -2, "native_region_select_face");
-	lua_pushcfunction(L, util_shape::l_region_intersect_p);    lua_setfield(L, -2, "native_intersect_p");
+	lua_pushcfunction(L, util_shape::l_decompose_aabbs);       lua_setfield(L, util_idx, "native_decompose_aabbs");
+	lua_pushcfunction(L, util_shape::l_region_op);             lua_setfield(L, util_idx, "native_region_op");
+	lua_pushcfunction(L, util_shape::l_region_evaluate);       lua_setfield(L, util_idx, "native_region_evaluate");
+	lua_pushcfunction(L, util_shape::l_any_occupied_p);        lua_setfield(L, util_idx, "native_any_occupied_p");
+	lua_pushcfunction(L, util_shape::l_region_volume);         lua_setfield(L, util_idx, "native_region_volume");
+	lua_pushcfunction(L, util_shape::l_region_equal_p);        lua_setfield(L, util_idx, "native_region_equal_p");
+	lua_pushcfunction(L, util_shape::l_region_walk);           lua_setfield(L, util_idx, "native_region_walk");
+	lua_pushcfunction(L, util_shape::l_region_simplify);       lua_setfield(L, util_idx, "native_region_simplify");
+	lua_pushcfunction(L, util_shape::l_region_select_face);    lua_setfield(L, util_idx, "native_region_select_face");
+	lua_pushcfunction(L, util_shape::l_region_intersect_p);    lua_setfield(L, util_idx, "native_intersect_p");
 
 	// table.lua  ?? function / 3 porting lua to c++
-	lua_pushcfunction(L, util_table::l_table_update);             lua_setfield(L, -2, "native_table_update");
-	lua_pushcfunction(L, util_table::l_table_reverse);             lua_setfield(L, -2, "native_table_reverse");
-	lua_pushcfunction(L, util_table::l_table_max_index);             lua_setfield(L, -2, "native_table_max_index");
+	lua_pushcfunction(L, util_table::l_table_update);             lua_setfield(L, util_idx, "native_table_update");
+	lua_pushcfunction(L, util_table::l_table_reverse);             lua_setfield(L, util_idx, "native_table_reverse");
+	lua_pushcfunction(L, util_table::l_table_max_index);             lua_setfield(L, util_idx, "native_table_max_index");
 
 	lua_pop(L, 1); // mcl_util テーブルをお片付け
 }
@@ -212,16 +225,13 @@ void Initialize(lua_State *L, int top)
 //	actionstream << "[tga_encoder] Native C++ implementation successfully injected." << std::endl;
 	lua_pop(L, 1);
 
-	// Resister for Main thread
-	bind_mcl_util_muscles(L);
-	actionstream << "[lua_api]: [mcl/mods/CORE]: C++ API for client." << std::endl;
-}
-
-// ─── 🏆 3. 【非同期マルチスレッド環境（InitializeAsync）へ、全筋肉を最初からダイレクト同時創世！！】 ───
-void InitializeAsync(lua_State *L, int top)
-{
-	bind_mcl_util_muscles(L); // 👑 非同期スレッドが生まれたド頭の瞬間に、直接C++筋肉を叩き込む！！
-
+	// Resister for Main thread only
+	bind_mcl_util_mainthread(L);
+	// Resister for Main thread and other
+	// Resister for Emerge-0 thread src/script/script_api/s_mapgen.cpp
+	// Resister for AsyncWorker thread src/script/script_api/s_async.cpp
+	bind_mcl_util_multithread(L);
+	actionstream << "[lua_api]: [mcl/mods/CORE]: Resister C++ API for client." << std::endl;
 }
 
 } // namespace l_mcl_core_client
