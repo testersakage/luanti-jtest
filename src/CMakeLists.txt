@@ -514,13 +514,15 @@ set(common_SRCS
 	mcl/stacktrace.cpp
 	mcl/core/tga_encoder.cpp
 #	mcl/core/tga_encoder.h
+	mcl/core/util_compat.cpp
+	mcl/core/util_environment.cpp
 	mcl/core/util_item.cpp
 	mcl/core/util_misc.cpp
 	mcl/core/util_object.cpp
 	mcl/core/util_queue.cpp
 	mcl/core/util_ringbuffer.cpp
 	mcl/core/util_shape.cpp
-#	mcl/core/util_table.cpp
+	mcl/core/util_table.cpp
 )
 
 if(ANDROID)

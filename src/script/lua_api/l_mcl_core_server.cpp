@@ -1,19 +1,21 @@
 // src/script/lua_api/l_mcl_core_server.cpp
 #include "l_mcl_core_server.h"
 #include "mcl/core/tga_encoder.h"
+#include "mcl/core/util_compat.h"
+#include "mcl/core/util_environment.h"
 #include "mcl/core/util_item.h"
 #include "mcl/core/util_misc.h"
 #include "mcl/core/util_object.h"
 #include "mcl/core/util_queue.h"
 #include "mcl/core/util_ringbuffer.h"
 #include "mcl/core/util_shape.h"
-//#include "mcl/core/util_table.h"
+#include "mcl/core/util_table.h"
 #include "log.h" //  【厳置】errorstream ログ直結マクロ
 
 namespace l_mcl_core_server {
 
 //   【メインスレッド ＆ 非同期 Async スレッド、双方で全く同じ筋肉を1発創世する無敵のヘルパー】
-void bind_mcl_util_muscles(lua_State *L) {
+void bind_mcl_util_mainthread(lua_State *L) {
 	lua_getglobal(L, "mcl_util");
 	if (!lua_istable(L, -1)) {
 		lua_pop(L, 1);
@@ -21,59 +23,91 @@ void bind_mcl_util_muscles(lua_State *L) {
 		lua_pushvalue(L, -1);
 		lua_setglobal(L, "mcl_util"); // _G.mcl_util = {} を最初から一発創世！
 	}
+	int util_idx = lua_gettop(L); // 基準となるテーブルの部屋番号を固定
 	
+	// compat.lua ? function / ? porting lua to c++
+	lua_pushcfunction(L, util_compat::l_vector_random_direction); lua_setfield(L, util_idx, "random_direction");
+	lua_pushcfunction(L, util_compat::l_connected_players);       lua_setfield(L, util_idx, "connected_players");
+	lua_pushcfunction(L, util_compat::l_get_node_raw);           lua_setfield(L, util_idx, "get_node_raw");
+	lua_pushcfunction(L, util_compat::l_time_to_day_night_ratio); lua_setfield(L, util_idx, "time_to_ratio");
+
+	// enviroment.lua ? function / ? porting lua to c++
+	lua_pushcfunction(L, util_environment::l_get_double_container_neighbor_pos); lua_setfield(L, util_idx, "get_double_container_neighbor_pos");
+	lua_pushcfunction(L, util_environment::l_get_eligible_transfer_item_slot);    lua_setfield(L, util_idx, "get_eligible_transfer_item_slot");
+	lua_pushcfunction(L, util_environment::l_drop_items_from_meta_container);    lua_setfield(L, util_idx, "drop_items_from_meta_container");
+	lua_pushcfunction(L, util_environment::l_get_pointed_thing);               lua_setfield(L, util_idx, "get_pointed_thing");
+	lua_pushcfunction(L, util_environment::l_traverse_tower);                  lua_setfield(L, util_idx, "traverse_tower");
+	lua_pushcfunction(L, util_environment::l_traverse_tower_group);            lua_setfield(L, util_idx, "traverse_tower_group");
+	lua_pushcfunction(L, util_environment::l_replace_node_vm);                 lua_setfield(L, util_idx, "replace_node_vm");
+	lua_pushcfunction(L, util_environment::l_bulk_set_node_vm);                lua_setfield(L, util_idx, "bulk_set_node_vm");
+	lua_pushcfunction(L, util_environment::l_circle_bulk_set_node_vm);          lua_setfield(L, util_idx, "circle_bulk_set_node_vm");
+	lua_pushcfunction(L, util_environment::l_environment_globalstep);          lua_setfield(L, util_idx, "native_environment_globalstep");
+
 	// item.lua 5 function / 5 porting lua to c++
-	lua_pushcfunction(L, util_item::l_get_burntime);          lua_setfield(L, -2, "get_burntime");
-	lua_pushcfunction(L, util_item::l_is_fuel);                lua_setfield(L, -2, "is_fuel");
-	lua_pushcfunction(L, util_item::l_calculate_durability);  lua_setfield(L, -2, "calculate_durability"); 
-	lua_pushcfunction(L, util_item::l_use_item_durability);    lua_setfield(L, -2, "use_item_durability");
-	lua_pushcfunction(L, util_item::l_is_item_or_in_group);   lua_setfield(L, -2, "is_item_or_in_group"); 
+	lua_pushcfunction(L, util_item::l_get_burntime);          lua_setfield(L, util_idx, "get_burntime");
+	lua_pushcfunction(L, util_item::l_is_fuel);                lua_setfield(L, util_idx, "is_fuel");
+	lua_pushcfunction(L, util_item::l_calculate_durability);  lua_setfield(L, util_idx, "calculate_durability"); 
+	lua_pushcfunction(L, util_item::l_use_item_durability);    lua_setfield(L, util_idx, "use_item_durability");
+	lua_pushcfunction(L, util_item::l_is_item_or_in_group);   lua_setfield(L, util_idx, "is_item_or_in_group"); 
 
 	// misc.lua 17 function / 3 porting lua to c++
-	lua_pushcfunction(L, util_misc::l_generate_uuid);         lua_setfield(L, -2, "generate_uuid");
-	lua_pushcfunction(L, util_misc::l_get_nodepos);           lua_setfield(L, -2, "get_nodepos");        // 👑 これで天候も実績も1発完全大開通！
-	lua_pushcfunction(L, util_misc::l_calculate_knockback);   lua_setfield(L, -2, "calculate_knockback");
+	lua_pushcfunction(L, util_misc::l_generate_uuid);         lua_setfield(L, util_idx, "generate_uuid");
+	lua_pushcfunction(L, util_misc::l_get_nodepos);           lua_setfield(L, util_idx, "get_nodepos");
+	lua_pushcfunction(L, util_misc::l_calculate_knockback);   lua_setfield(L, util_idx, "calculate_knockback");
 
 	// object.lua 15 function / 6 porting lua to c++
-	lua_pushcfunction(L, util_object::l_props_changed);         lua_setfield(L, -2, "props_changed");
-	lua_pushcfunction(L, util_object::l_get_object_center);     lua_setfield(L, -2, "get_object_center");
-	lua_pushcfunction(L, util_object::l_target_eye_height);     lua_setfield(L, -2, "target_eye_height");
-	lua_pushcfunction(L, util_object::l_target_eye_pos);        lua_setfield(L, -2, "target_eye_pos");
-	lua_pushcfunction(L, util_object::l_set_bone_position);     lua_setfield(L, -2, "set_bone_position");
-	lua_pushcfunction(L, util_object::l_rotation_to_irrlicht);   lua_setfield(L, -2, "rotation_to_irrlicht"); // 👑 アニメーション超速化大開通！
+	lua_pushcfunction(L, util_object::l_props_changed);         lua_setfield(L, util_idx, "props_changed");
+	lua_pushcfunction(L, util_object::l_get_object_center);     lua_setfield(L, util_idx, "get_object_center");
+	lua_pushcfunction(L, util_object::l_target_eye_height);     lua_setfield(L, util_idx, "target_eye_height");
+	lua_pushcfunction(L, util_object::l_target_eye_pos);        lua_setfield(L, util_idx, "target_eye_pos");
+	lua_pushcfunction(L, util_object::l_set_bone_position);     lua_setfield(L, util_idx, "set_bone_position");
+	lua_pushcfunction(L, util_object::l_rotation_to_irrlicht);   lua_setfield(L, util_idx, "rotation_to_irrlicht");
 
 	// queue.lua  5 function / 3 porting lua to c++
-	lua_pushcfunction(L, util_queue::l_queue_enqueue);  lua_setfield(L, -2, "native_enqueue");
-	lua_pushcfunction(L, util_queue::l_queue_dequeue);  lua_setfield(L, -2, "native_dequeue");
-	lua_pushcfunction(L, util_queue::l_queue_peek);     lua_setfield(L, -2, "native_peek");     // 👑 追加！
-	lua_pushcfunction(L, util_queue::l_queue_size);     lua_setfield(L, -2, "native_queue_size");
-	lua_pushcfunction(L, util_queue::l_queue_iterate);  lua_setfield(L, -2, "native_iterate");  // 👑 追加！
+	lua_pushcfunction(L, util_queue::l_queue_enqueue);  lua_setfield(L, util_idx, "native_enqueue");
+	lua_pushcfunction(L, util_queue::l_queue_dequeue);  lua_setfield(L, util_idx, "native_dequeue");
+	lua_pushcfunction(L, util_queue::l_queue_peek);     lua_setfield(L, util_idx, "native_peek");
+	lua_pushcfunction(L, util_queue::l_queue_size);     lua_setfield(L, util_idx, "native_queue_size");
+	lua_pushcfunction(L, util_queue::l_queue_iterate);  lua_setfield(L, util_idx, "native_iterate");
 
 	// queue.lua  7 function / 4 porting lua to c++
-	lua_pushcfunction(L, util_ringbuffer::l_rb_insert);               lua_setfield(L, -2, "native_rb_insert");
-	lua_pushcfunction(L, util_ringbuffer::l_rb_indexof);              lua_setfield(L, -2, "native_rb_indexof");
-	lua_pushcfunction(L, util_ringbuffer::l_rb_insert_if_not_exists); lua_setfield(L, -2, "native_rb_insert_if_not_exists");
-	lua_pushcfunction(L, util_ringbuffer::l_rb_serialize);            lua_setfield(L, -2, "native_rb_serialize"); // 👑 最初から1発登録！
-
-	lua_pushcfunction(L, util_shape::l_region_equal_p);        lua_setfield(L, -2, "native_region_equal_p");
-	lua_pushcfunction(L, util_shape::l_region_walk);           lua_setfield(L, -2, "native_region_walk"); // 👑 最初から1発登録！
-	lua_pushcfunction(L, util_shape::l_region_simplify);       lua_setfield(L, -2, "native_region_simplify"); // 👑 最初から1発登録！
-	lua_pushcfunction(L, util_shape::l_region_select_face);    lua_setfield(L, -2, "native_region_select_face"); // 👑 最初から1発登録！
-
-	// shape.lua  4? function / 9 porting lua to c++
-	lua_pushcfunction(L, util_shape::l_decompose_aabbs);       lua_setfield(L, -2, "native_decompose_aabbs");
-	lua_pushcfunction(L, util_shape::l_region_op);             lua_setfield(L, -2, "native_region_op");
-	lua_pushcfunction(L, util_shape::l_region_evaluate);       lua_setfield(L, -2, "native_region_evaluate"); // 👑 追加！
-	lua_pushcfunction(L, util_shape::l_any_occupied_p);        lua_setfield(L, -2, "native_any_occupied_p");  // 👑 追加！
-	lua_pushcfunction(L, util_shape::l_region_volume);         lua_setfield(L, -2, "native_region_volume");
-	lua_pushcfunction(L, util_shape::l_region_equal_p);        lua_setfield(L, -2, "native_region_equal_p");
-	lua_pushcfunction(L, util_shape::l_region_walk);           lua_setfield(L, -2, "native_region_walk");
-	lua_pushcfunction(L, util_shape::l_region_simplify);       lua_setfield(L, -2, "native_region_simplify");
-	lua_pushcfunction(L, util_shape::l_region_select_face);    lua_setfield(L, -2, "native_region_select_face");
+	lua_pushcfunction(L, util_ringbuffer::l_rb_insert);               lua_setfield(L, util_idx, "native_rb_insert");
+	lua_pushcfunction(L, util_ringbuffer::l_rb_indexof);              lua_setfield(L, util_idx, "native_rb_indexof");
+	lua_pushcfunction(L, util_ringbuffer::l_rb_insert_if_not_exists); lua_setfield(L, util_idx, "native_rb_insert_if_not_exists");
+	lua_pushcfunction(L, util_ringbuffer::l_rb_serialize);            lua_setfield(L, util_idx, "native_rb_serialize");
 
 	lua_pop(L, 1); // mcl_util テーブルをお片付け
 }
 
+void bind_mcl_util_multithread(lua_State *L) {
+	lua_getglobal(L, "mcl_util");
+	if (!lua_istable(L, -1)) {
+		lua_pop(L, 1);
+		lua_newtable(L); 
+		lua_pushvalue(L, -1);
+		lua_setglobal(L, "mcl_util"); // _G.mcl_util = {} を最初から一発創世！
+	}
+	int util_idx = lua_gettop(L); // 基準となるテーブルの部屋番号を固定
+
+	// shape.lua  4? function / 10 porting lua to c++
+	lua_pushcfunction(L, util_shape::l_decompose_aabbs);       lua_setfield(L, util_idx, "native_decompose_aabbs");
+	lua_pushcfunction(L, util_shape::l_region_op);             lua_setfield(L, util_idx, "native_region_op");
+	lua_pushcfunction(L, util_shape::l_region_evaluate);       lua_setfield(L, util_idx, "native_region_evaluate");
+	lua_pushcfunction(L, util_shape::l_any_occupied_p);        lua_setfield(L, util_idx, "native_any_occupied_p");
+	lua_pushcfunction(L, util_shape::l_region_volume);         lua_setfield(L, util_idx, "native_region_volume");
+	lua_pushcfunction(L, util_shape::l_region_equal_p);        lua_setfield(L, util_idx, "native_region_equal_p");
+	lua_pushcfunction(L, util_shape::l_region_walk);           lua_setfield(L, util_idx, "native_region_walk");
+	lua_pushcfunction(L, util_shape::l_region_simplify);       lua_setfield(L, util_idx, "native_region_simplify");
+	lua_pushcfunction(L, util_shape::l_region_select_face);    lua_setfield(L, util_idx, "native_region_select_face");
+	lua_pushcfunction(L, util_shape::l_region_intersect_p);    lua_setfield(L, util_idx, "native_intersect_p");
+
+	// table.lua  ?? function / 3 porting lua to c++
+	lua_pushcfunction(L, util_table::l_table_update);             lua_setfield(L, util_idx, "native_table_update");
+	lua_pushcfunction(L, util_table::l_table_reverse);             lua_setfield(L, util_idx, "native_table_reverse");
+	lua_pushcfunction(L, util_table::l_table_max_index);             lua_setfield(L, util_idx, "native_table_max_index");
+
+	lua_pop(L, 1); // mcl_util テーブルをお片付け
+}
 #define L_MCL_MAP_METATABLE "mcl_core_map_object"
 
 // 🕵️‍♂️ 【公式残存】スタックの状況を 100% 確実にコンソールへスタンプする無敵のレーダー
@@ -191,16 +225,13 @@ void Initialize(lua_State *L, int top)
 //	actionstream << "[tga_encoder] Native C++ implementation successfully injected." << std::endl;
 	lua_pop(L, 1);
 
-	// Resister for Main thread
-	bind_mcl_util_muscles(L);
-	actionstream << "[lua_api]: [mcl/mods/CORE]: C++ implementation successfully injected into ASYNC thread." << std::endl;
-}
-
-// ─── 🏆 3. 【非同期マルチスレッド環境（InitializeAsync）へ、全筋肉を最初からダイレクト同時創世！！】 ───
-void InitializeAsync(lua_State *L, int top)
-{
-	bind_mcl_util_muscles(L); // 👑 非同期スレッドが生まれたド頭の瞬間に、直接C++筋肉を叩き込む！！
-
+	// Resister for Main thread only
+	bind_mcl_util_mainthread(L);
+	// Resister for Main thread and other
+	// Resister for Emerge-0 thread src/script/script_api/s_mapgen.cpp
+	// Resister for AsyncWorker thread src/script/script_api/s_async.cpp
+	bind_mcl_util_multithread(L);
+	actionstream << "[lua_api]: [mcl/mods/CORE]: Resister C++ API for server." << std::endl;
 }
 
 } // namespace l_mcl_core_server
