@@ -512,8 +512,8 @@ set(common_SRCS
 	${server_network_SRCS}
 	utf8_53.cpp
 	mcl/stacktrace.cpp
-	mcl/core/tga_encoder.cpp
-#	mcl/core/tga_encoder.h
+	mcl/core/damage.cpp
+	mcl/core/explosions.cpp
 	mcl/core/util_compat.cpp
 	mcl/core/util_environment.cpp
 	mcl/core/util_item.cpp
@@ -523,6 +523,9 @@ set(common_SRCS
 	mcl/core/util_ringbuffer.cpp
 	mcl/core/util_shape.cpp
 	mcl/core/util_table.cpp
+	mcl/core/worlds.cpp
+	mcl/core/tga_encoder.cpp
+#	mcl/core/tga_encoder.h
 )
 
 if(ANDROID)

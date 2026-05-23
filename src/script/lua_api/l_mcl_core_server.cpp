@@ -1,6 +1,7 @@
 // src/script/lua_api/l_mcl_core_server.cpp
 #include "l_mcl_core_server.h"
-#include "mcl/core/tga_encoder.h"
+#include "mcl/core/damage.h"
+#include "mcl/core/explosions.h"
 #include "mcl/core/util_compat.h"
 #include "mcl/core/util_environment.h"
 #include "mcl/core/util_item.h"
@@ -10,6 +11,8 @@
 #include "mcl/core/util_ringbuffer.h"
 #include "mcl/core/util_shape.h"
 #include "mcl/core/util_table.h"
+#include "mcl/core/worlds.h"
+#include "mcl/core/tga_encoder.h"
 #include "log.h" //  【厳置】errorstream ログ直結マクロ
 
 namespace l_mcl_core_server {
@@ -25,13 +28,13 @@ void bind_mcl_util_mainthread(lua_State *L) {
 	}
 	int util_idx = lua_gettop(L); // 基準となるテーブルの部屋番号を固定
 	
-	// compat.lua ? function / ? porting lua to c++
+	// util/compat.lua ? function / ? porting lua to c++
 	lua_pushcfunction(L, util_compat::l_vector_random_direction); lua_setfield(L, util_idx, "random_direction");
 	lua_pushcfunction(L, util_compat::l_connected_players);       lua_setfield(L, util_idx, "connected_players");
 	lua_pushcfunction(L, util_compat::l_get_node_raw);           lua_setfield(L, util_idx, "get_node_raw");
 	lua_pushcfunction(L, util_compat::l_time_to_day_night_ratio); lua_setfield(L, util_idx, "time_to_ratio");
 
-	// enviroment.lua ? function / ? porting lua to c++
+	// util/enviroment.lua ? function / ? porting lua to c++
 	lua_pushcfunction(L, util_environment::l_get_double_container_neighbor_pos); lua_setfield(L, util_idx, "get_double_container_neighbor_pos");
 	lua_pushcfunction(L, util_environment::l_get_eligible_transfer_item_slot);    lua_setfield(L, util_idx, "get_eligible_transfer_item_slot");
 	lua_pushcfunction(L, util_environment::l_drop_items_from_meta_container);    lua_setfield(L, util_idx, "drop_items_from_meta_container");
@@ -43,19 +46,19 @@ void bind_mcl_util_mainthread(lua_State *L) {
 	lua_pushcfunction(L, util_environment::l_circle_bulk_set_node_vm);          lua_setfield(L, util_idx, "circle_bulk_set_node_vm");
 	lua_pushcfunction(L, util_environment::l_environment_globalstep);          lua_setfield(L, util_idx, "native_environment_globalstep");
 
-	// item.lua 5 function / 5 porting lua to c++
+	// util/item.lua 5 function / 5 porting lua to c++
 	lua_pushcfunction(L, util_item::l_get_burntime);          lua_setfield(L, util_idx, "get_burntime");
 	lua_pushcfunction(L, util_item::l_is_fuel);                lua_setfield(L, util_idx, "is_fuel");
 	lua_pushcfunction(L, util_item::l_calculate_durability);  lua_setfield(L, util_idx, "calculate_durability"); 
 	lua_pushcfunction(L, util_item::l_use_item_durability);    lua_setfield(L, util_idx, "use_item_durability");
 	lua_pushcfunction(L, util_item::l_is_item_or_in_group);   lua_setfield(L, util_idx, "is_item_or_in_group"); 
 
-	// misc.lua 17 function / 3 porting lua to c++
+	// util/misc.lua 17 function / 3 porting lua to c++
 	lua_pushcfunction(L, util_misc::l_generate_uuid);         lua_setfield(L, util_idx, "generate_uuid");
 	lua_pushcfunction(L, util_misc::l_get_nodepos);           lua_setfield(L, util_idx, "get_nodepos");
 	lua_pushcfunction(L, util_misc::l_calculate_knockback);   lua_setfield(L, util_idx, "calculate_knockback");
 
-	// object.lua 15 function / 6 porting lua to c++
+	// util/object.lua 15 function / 6 porting lua to c++
 	lua_pushcfunction(L, util_object::l_props_changed);         lua_setfield(L, util_idx, "props_changed");
 	lua_pushcfunction(L, util_object::l_get_object_center);     lua_setfield(L, util_idx, "get_object_center");
 	lua_pushcfunction(L, util_object::l_target_eye_height);     lua_setfield(L, util_idx, "target_eye_height");
@@ -63,18 +66,35 @@ void bind_mcl_util_mainthread(lua_State *L) {
 	lua_pushcfunction(L, util_object::l_set_bone_position);     lua_setfield(L, util_idx, "set_bone_position");
 	lua_pushcfunction(L, util_object::l_rotation_to_irrlicht);   lua_setfield(L, util_idx, "rotation_to_irrlicht");
 
-	// queue.lua  5 function / 3 porting lua to c++
+	// util/queue.lua  5 function / 3 porting lua to c++
 	lua_pushcfunction(L, util_queue::l_queue_enqueue);  lua_setfield(L, util_idx, "native_enqueue");
 	lua_pushcfunction(L, util_queue::l_queue_dequeue);  lua_setfield(L, util_idx, "native_dequeue");
 	lua_pushcfunction(L, util_queue::l_queue_peek);     lua_setfield(L, util_idx, "native_peek");
 	lua_pushcfunction(L, util_queue::l_queue_size);     lua_setfield(L, util_idx, "native_queue_size");
 	lua_pushcfunction(L, util_queue::l_queue_iterate);  lua_setfield(L, util_idx, "native_iterate");
 
-	// queue.lua  7 function / 4 porting lua to c++
+	// util/ringbuffer.lua  7 function / 4 porting lua to c++
 	lua_pushcfunction(L, util_ringbuffer::l_rb_insert);               lua_setfield(L, util_idx, "native_rb_insert");
 	lua_pushcfunction(L, util_ringbuffer::l_rb_indexof);              lua_setfield(L, util_idx, "native_rb_indexof");
 	lua_pushcfunction(L, util_ringbuffer::l_rb_insert_if_not_exists); lua_setfield(L, util_idx, "native_rb_insert_if_not_exists");
 	lua_pushcfunction(L, util_ringbuffer::l_rb_serialize);            lua_setfield(L, util_idx, "native_rb_serialize");
+
+	// worlds/init.lua  5 poring lua to c++
+	lua_pushcfunction(L, worlds::l_worlds_is_in_void);                 lua_setfield(L, util_idx, "native_worlds_is_in_void");
+	lua_pushcfunction(L, worlds::l_worlds_y_to_layer);                 lua_setfield(L, util_idx, "native_worlds_y_to_layer");
+	lua_pushcfunction(L, worlds::l_worlds_pos_to_dimension);           lua_setfield(L, util_idx, "native_worlds_pos_to_dimension");
+	lua_pushcfunction(L, worlds::l_worlds_layer_to_y);                 lua_setfield(L, util_idx, "native_worlds_layer_to_y");
+	lua_pushcfunction(L, worlds::l_worlds_tick_chunk_inhabited_time); lua_setfield(L, util_idx, "native_worlds_tick_chunk_inhabited_time");
+
+	// damage/init.lua  3 poring lua to c++
+	lua_pushcfunction(L, damage::l_damage_calculate_modifier); lua_setfield(L, util_idx, "native_damage_calculate_modifier");
+	lua_pushcfunction(L, damage::l_damage_tick_health);        lua_setfield(L, util_idx, "native_damage_tick_health");
+	lua_pushcfunction(L, damage::l_damage_sync_to_engine);     lua_setfield(L, util_idx, "native_damage_sync_to_engine");
+
+	// explosions/init.lua  3 poring lua to c++
+	lua_pushcfunction(L, explosions::l_explosions_raycast_sphere);   lua_setfield(L, util_idx, "native_explosions_raycast_sphere");
+	lua_pushcfunction(L, explosions::l_explosions_calculate_damage); lua_setfield(L, util_idx, "native_explosions_calculate_damage");
+	lua_pushcfunction(L, explosions::l_explosions_scorch_nodes);     lua_setfield(L, util_idx, "native_explosions_scorch_nodes");
 
 	lua_pop(L, 1); // mcl_util テーブルをお片付け
 }
@@ -89,7 +109,7 @@ void bind_mcl_util_multithread(lua_State *L) {
 	}
 	int util_idx = lua_gettop(L); // 基準となるテーブルの部屋番号を固定
 
-	// shape.lua  4? function / 10 porting lua to c++
+	// util/shape.lua  4? function / 10 porting lua to c++
 	lua_pushcfunction(L, util_shape::l_decompose_aabbs);       lua_setfield(L, util_idx, "native_decompose_aabbs");
 	lua_pushcfunction(L, util_shape::l_region_op);             lua_setfield(L, util_idx, "native_region_op");
 	lua_pushcfunction(L, util_shape::l_region_evaluate);       lua_setfield(L, util_idx, "native_region_evaluate");
@@ -101,7 +121,7 @@ void bind_mcl_util_multithread(lua_State *L) {
 	lua_pushcfunction(L, util_shape::l_region_select_face);    lua_setfield(L, util_idx, "native_region_select_face");
 	lua_pushcfunction(L, util_shape::l_region_intersect_p);    lua_setfield(L, util_idx, "native_intersect_p");
 
-	// table.lua  ?? function / 3 porting lua to c++
+	// util/table.lua  ?? function / 3 porting lua to c++
 	lua_pushcfunction(L, util_table::l_table_update);             lua_setfield(L, util_idx, "native_table_update");
 	lua_pushcfunction(L, util_table::l_table_reverse);             lua_setfield(L, util_idx, "native_table_reverse");
 	lua_pushcfunction(L, util_table::l_table_max_index);             lua_setfield(L, util_idx, "native_table_max_index");
