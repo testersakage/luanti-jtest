@@ -1,6 +1,7 @@
 // src/mcl/core/damage.cpp
 
 #include "damage.h"
+#include "worlds.h"
 #include "mcl/stacktrace.h"
 #include <lua.hpp>
 #include <unordered_map>
@@ -207,4 +208,23 @@ namespace damage {
 		}
 		return 0;
 	}
+
+	// 👑 💎 4. native_damage_bulk_save_all (総大将ディレクションによる究極の1行セーブAPI)
+	//    Lua側から10秒おきに1回呼ばれるだけで、C++の超高速なメモリ走査（std::unordered_map）によって
+	//    全プレイヤーのHPと、全チャンクの滞在時間のすべてを、一瞬で ModStorage へバルク同期（セーブ）する！
+	int l_damage_bulk_save_all(lua_State *L)
+	{
+		// 1. まずはC++メモリにある全プレイヤーのHPを名指しで一括DISKコミット
+		for (const auto& pair : g_player_health) {
+			if (g_health_loaded[pair.first]) {
+				save_health_to_storage(L, pair.first, pair.second);
+			}
+		}
+
+		// 2. 続いて世界のworldsネームスペースにあるチャンクタイマーを一気に一括DISKコミット
+		worlds::save_chunk_timers_to_storage(L);
+
+		return 0; // スタックを1ドットも汚さずに無音で Lua へリターン！
+	}
+
 }

@@ -90,6 +90,8 @@ void bind_mcl_util_mainthread(lua_State *L) {
 	lua_pushcfunction(L, damage::l_damage_calculate_modifier); lua_setfield(L, util_idx, "native_damage_calculate_modifier");
 	lua_pushcfunction(L, damage::l_damage_tick_health);        lua_setfield(L, util_idx, "native_damage_tick_health");
 	lua_pushcfunction(L, damage::l_damage_sync_to_engine);     lua_setfield(L, util_idx, "native_damage_sync_to_engine");
+	// save interval API
+	lua_pushcfunction(L, damage::l_damage_bulk_save_all); lua_setfield(L, util_idx, "native_damage_bulk_save_all");
 
 	// explosions/init.lua  3 poring lua to c++
 	lua_pushcfunction(L, explosions::l_explosions_raycast_sphere);   lua_setfield(L, util_idx, "native_explosions_raycast_sphere");

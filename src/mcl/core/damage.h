@@ -14,6 +14,7 @@ namespace damage {
 	int l_damage_calculate_modifier(lua_State *L);
 	int l_damage_tick_health(lua_State *L);
 	int l_damage_sync_to_engine(lua_State *L);
+	int l_damage_bulk_save_all(lua_State *L);
 
 	// 👑 データ保護インフラ：C++メモリのHPデータを ModStorage へ強制ダンプセーブ / ロードする関数
 	void save_health_to_storage(lua_State *L, const std::string& name, float hp);
