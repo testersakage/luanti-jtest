@@ -2,6 +2,7 @@
 set(mcl_core_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/damage.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/explosions.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/liquids.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/util_compat.cpp  # 
 	${CMAKE_CURRENT_SOURCE_DIR}/util_environment.cpp  # 
 	${CMAKE_CURRENT_SOURCE_DIR}/util_item.cpp  # 

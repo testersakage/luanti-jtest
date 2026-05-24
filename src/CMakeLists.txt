@@ -514,6 +514,7 @@ set(common_SRCS
 	mcl/stacktrace.cpp
 	mcl/core/damage.cpp
 	mcl/core/explosions.cpp
+	mcl/core/liquids.cpp
 	mcl/core/util_compat.cpp
 	mcl/core/util_environment.cpp
 	mcl/core/util_item.cpp

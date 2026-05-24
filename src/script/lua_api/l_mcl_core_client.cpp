@@ -2,6 +2,7 @@
 #include "l_mcl_core_client.h"
 #include "mcl/core/damage.h"
 #include "mcl/core/explosions.h"
+#include "mcl/core/liquids.h"
 #include "mcl/core/util_compat.h"
 #include "mcl/core/util_environment.h"
 #include "mcl/core/util_item.h"
@@ -96,6 +97,13 @@ void bind_mcl_util_mainthread(lua_State *L) {
 	lua_pushcfunction(L, explosions::l_explosions_raycast_sphere);   lua_setfield(L, -2, "native_explosions_raycast_sphere");
 	lua_pushcfunction(L, explosions::l_explosions_calculate_damage); lua_setfield(L, -2, "native_explosions_calculate_damage");
 	lua_pushcfunction(L, explosions::l_explosions_scorch_nodes);     lua_setfield(L, -2, "native_explosions_scorch_nodes");
+
+	// liquids/init.lua  3 poring lua to c++
+	lua_pushcfunction(L, liquids::l_liquids_find_flow_direction); lua_setfield(L, -2, "native_liquids_find_flow_direction");
+//	lua_pushcfunction(L, liquids::l_liquids_calculate_spread);    lua_setfield(L, -2, "native_liquids_calculate_spread");
+//	lua_pushcfunction(L, liquids::l_liquids_bulk_update_nodes);   lua_setfield(L, -2, "native_liquids_bulk_update_nodes");
+	// liquids(flowlib)  1 poring lua to c++
+	lua_pushcfunction(L, liquids::l_liquids_quick_flow_native); lua_setfield(L, -2, "native_liquids_quick_flow");
 
 	lua_pop(L, 1); // mcl_util テーブルをお片付け
 }
