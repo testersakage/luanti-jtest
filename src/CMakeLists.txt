@@ -527,6 +527,8 @@ set(common_SRCS
 	mcl/core/worlds.cpp
 	mcl/core/tga_encoder.cpp
 #	mcl/core/tga_encoder.h
+#	mcl/entities/mobs.cpp
+	mcl/entities/mobs_pathfinding.cpp
 )
 
 if(ANDROID)
