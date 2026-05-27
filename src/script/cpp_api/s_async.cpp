@@ -24,6 +24,7 @@ extern "C" {
 #include "script/scripting_mainmenu.h"
 #endif
 #include "lua_api/l_base.h"
+#include "lua_api/l_mcl_core_server.h" 
 
 // if a job is waiting for this duration, an additional thread will be spawned
 static constexpr int AUTOSCALE_DELAY_MS = 1000;
@@ -261,6 +262,9 @@ void AsyncEngine::stepStuckWarning()
 /******************************************************************************/
 bool AsyncEngine::prepareEnvironment(lua_State* L, int top)
 {
+	// Lua to C++ API
+	l_mcl_core_server::bind_multithread_CORE(L); 
+
 	for (StateInitializer &stateInitializer : stateInitializers) {
 		stateInitializer(L, top);
 	}

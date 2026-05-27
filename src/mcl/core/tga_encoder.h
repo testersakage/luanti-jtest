@@ -6,6 +6,8 @@
 #include "irrlichttypes.h" // Luanti純正の u8, u16, u32 を使うため
 #include <lua.hpp>         // Lua API窓口と直結するため
 
+#define L_MCL_MAP_METATABLE "mcl_core_map_object"
+
 namespace tga_encoder {
 
 #pragma pack(push, 1)

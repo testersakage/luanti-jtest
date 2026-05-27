@@ -7,10 +7,13 @@
 #include "common/c_converter.h"
 #include "lua_api/l_vmanip.h"
 #include "emerge.h"
+#include "lua_api/l_mcl_core_server.h" 
 
 void ScriptApiMapgen::on_mods_loaded()
 {
 	SCRIPTAPI_PRECHECKHEADER
+
+	l_mcl_core_server::bind_multithread_CORE(L); 
 
 	// Get registered shutdown hooks
 	lua_getglobal(L, "core");

@@ -3,7 +3,7 @@
 #include <lua.hpp>
 
 namespace util_shape {
-	// ─── 🏆 【第3章完全閉幕：shape.lua 1117行・全10大数理APIの公式確定目次】 ───
+	// ─── 【shape.lua 全10大API】 ───
 	int l_decompose_aabbs(lua_State *L);    // #1
 	int l_region_op(lua_State *L);          // #2
 	int l_region_evaluate(lua_State *L);    // #3
@@ -15,4 +15,6 @@ namespace util_shape {
 	int l_region_select_face(lua_State *L); // #9
 	int l_region_intersect_p(lua_State *L); // #10
 
+	// 変数
+//	int l_var_set_aabb_weight(lua_State *L);
 }

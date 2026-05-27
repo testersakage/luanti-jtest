@@ -622,6 +622,8 @@ int l_circle_bulk_set_node_vm(lua_State *L)
 // ❌ 10. core.register_globalstep の内部処理のC++完全移植（毎フレームの時間ラグ完全絶滅）
 int l_environment_globalstep(lua_State *L)
 {
+	// **** カレンダーイベントは参照してない（lua側に任せる） ****
+
 	// 1. Lua側の update_calendar_events() を内部ノック
 	lua_getglobal(L, "mcl_util");
 	if (lua_istable(L, -1)) {
