@@ -40,7 +40,7 @@ void bind_mainthread_CORE(lua_State *L) {
 	// CORE/tga_encoder/init.lua  1 porting lua to c++
 	lua_pushcfunction(L, tga_encoder::l_tga_encode); lua_setfield(L, core_idx, "native_tga_encode");
 
-	// util/enviroment.lua 14 function / 10 porting lua to c++
+	// util/enviroment.lua 14 function / 9 porting lua to c++
 	lua_pushcfunction(L, util_environment::l_get_double_container_neighbor_pos); lua_setfield(L, core_idx, "native_get_double_container_neighbor_pos");
 	lua_pushcfunction(L, util_environment::l_get_eligible_transfer_item_slot);    lua_setfield(L, core_idx, "native_get_eligible_transfer_item_slot");
 	lua_pushcfunction(L, util_environment::l_drop_items_from_meta_container);    lua_setfield(L, core_idx, "native_drop_items_from_meta_container");
@@ -51,7 +51,7 @@ void bind_mainthread_CORE(lua_State *L) {
 	lua_pushcfunction(L, util_environment::l_bulk_set_node_vm);                lua_setfield(L, core_idx, "native_bulk_set_node_vm");
 	lua_pushcfunction(L, util_environment::l_circle_bulk_set_node_vm);          lua_setfield(L, core_idx, "native_circle_bulk_set_node_vm");
 	// 変数参照
-	lua_pushcfunction(L, util_environment::l_environment_globalstep);          lua_setfield(L, core_idx, "var_environment_globalstep");
+//	lua_pushcfunction(L, util_environment::l_environment_globalstep);          lua_setfield(L, core_idx, "var_environment_globalstep");
 
 	// util/item.lua 5 function / 1 porting lua to c++
 //	lua_pushcfunction(L, util_item::l_get_burntime);          lua_setfield(L, core_idx, "get_burntime");
@@ -72,13 +72,16 @@ void bind_mainthread_CORE(lua_State *L) {
 //	lua_pushcfunction(L, util_object::l_target_eye_pos);        lua_setfield(L, core_idx, "native_target_eye_pos");
 //	lua_pushcfunction(L, util_object::l_set_bone_position);     lua_setfield(L, core_idx, "native_set_bone_position");
 	lua_pushcfunction(L, util_object::l_rotation_to_irrlicht);   lua_setfield(L, core_idx, "native_rotation_to_irrlicht");
-
+/*
 	// damage/init.lua  3 poring lua to c++
 	lua_pushcfunction(L, damage::l_damage_calculate_modifier); lua_setfield(L, core_idx, "native_damage_calculate_modifier");
 	lua_pushcfunction(L, damage::l_damage_tick_health);        lua_setfield(L, core_idx, "native_damage_tick_health");
 	lua_pushcfunction(L, damage::l_damage_sync_to_engine);     lua_setfield(L, core_idx, "native_damage_sync_to_engine");
 	// save interval API
 	lua_pushcfunction(L, damage::l_damage_bulk_save_all); lua_setfield(L, core_idx, "native_damage_bulk_save_all");
+*/
+	// damage/init.lua  1 poring lua to c++
+	lua_pushcfunction(L, damage::l_native_from_mt);		lua_setfield(L, core_idx, "native_from_mt");
 
 	// explosions/init.lua  2 poring lua to c++
 	lua_pushcfunction(L, explosions::l_native_compute_sphere_rays); lua_setfield(L, core_idx, "native_compute_sphere_rays");

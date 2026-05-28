@@ -1,7 +1,7 @@
 // src/mcl/core/util_environment.cpp
 #include "util_environment.h"
 #include "mcl/stacktrace.h"
-#include "util_compat.h" // time_to_ratio 結線！
+//#include "util_compat.h" // time_to_ratio 結線！
 
 #include <string>
 
@@ -618,7 +618,7 @@ int l_circle_bulk_set_node_vm(lua_State *L)
 
 	lua_settop(L, 0); return 0;
 }
-
+/*
 // ❌ 10. core.register_globalstep の内部処理のC++完全移植（毎フレームの時間ラグ完全絶滅）
 int l_environment_globalstep(lua_State *L)
 {
@@ -651,5 +651,5 @@ int l_environment_globalstep(lua_State *L)
 	lua_settop(L, 0);
 	return 0;
 }
-
+*/
 } // namespace util_environment

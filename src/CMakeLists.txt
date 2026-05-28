@@ -516,13 +516,13 @@ set(common_SRCS
 	mcl/core/explosions.cpp
 	mcl/core/flowlib.cpp
 #	mcl/core/liquids.cpp
-	mcl/core/util_compat.cpp
+#	mcl/core/util_compat.cpp
 	mcl/core/util_environment.cpp
 	mcl/core/util_item.cpp
 	mcl/core/util_misc.cpp
 	mcl/core/util_object.cpp
-	mcl/core/util_queue.cpp
-	mcl/core/util_ringbuffer.cpp
+#	mcl/core/util_queue.cpp
+#	mcl/core/util_ringbuffer.cpp
 	mcl/core/util_shape.cpp
 	mcl/core/util_table.cpp
 	mcl/core/worlds.cpp

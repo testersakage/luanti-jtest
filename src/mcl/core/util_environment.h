@@ -14,5 +14,5 @@ namespace util_environment {
 	int l_bulk_set_node_vm(lua_State *L);
 	int l_circle_bulk_set_node_vm(lua_State *L);
 	// 変数参照
-	int l_environment_globalstep(lua_State *L);
+//	int l_environment_globalstep(lua_State *L);
 }
