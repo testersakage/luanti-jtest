@@ -167,7 +167,7 @@ namespace tga_encoder {
 		header.bits_per_pixel   = get_pixel_depth(color_format);
 
 		u8 alpha_bits = (header.bits_per_pixel == 32) ? 8 : ((header.bits_per_pixel == 16) ? 1 : 0);
-		header.image_descriptor = 0x20 | (alpha_bits & 0x0F); 
+		header.image_descriptor = (alpha_bits & 0x0F); 
 
 		header.color_map_first  = 0;
 		header.color_map_length = static_cast<u16>(colormap_pixels.size()); 
