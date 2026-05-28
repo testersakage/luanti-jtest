@@ -2,7 +2,8 @@
 #include "l_mcl_core_server.h"
 #include "mcl/core/damage.h"
 #include "mcl/core/explosions.h"
-#include "mcl/core/liquids.h"
+#include "mcl/core/flowlib.h"
+//#include "mcl/core/liquids.h"
 //#include "mcl/core/util_compat.h"
 #include "mcl/core/util_environment.h"
 #include "mcl/core/util_item.h"
@@ -96,13 +97,6 @@ void bind_mainthread_CORE(lua_State *L) {
 	lua_pushcfunction(L, util_ringbuffer::l_rb_insert_if_not_exists); lua_setfield(L, core_idx, "native_rb_insert_if_not_exists");
 	lua_pushcfunction(L, util_ringbuffer::l_rb_serialize);            lua_setfield(L, core_idx, "native_rb_serialize");
 */
-	// worlds/init.lua  5 poring lua to c++
-	lua_pushcfunction(L, worlds::l_worlds_is_in_void);                 lua_setfield(L, core_idx, "native_worlds_is_in_void");
-	lua_pushcfunction(L, worlds::l_worlds_y_to_layer);                 lua_setfield(L, core_idx, "native_worlds_y_to_layer");
-	lua_pushcfunction(L, worlds::l_worlds_pos_to_dimension);           lua_setfield(L, core_idx, "native_worlds_pos_to_dimension");
-	lua_pushcfunction(L, worlds::l_worlds_layer_to_y);                 lua_setfield(L, core_idx, "native_worlds_layer_to_y");
-	lua_pushcfunction(L, worlds::l_worlds_tick_chunk_inhabited_time); lua_setfield(L, core_idx, "native_worlds_tick_chunk_inhabited_time");
-
 	// damage/init.lua  3 poring lua to c++
 	lua_pushcfunction(L, damage::l_damage_calculate_modifier); lua_setfield(L, core_idx, "native_damage_calculate_modifier");
 	lua_pushcfunction(L, damage::l_damage_tick_health);        lua_setfield(L, core_idx, "native_damage_tick_health");
@@ -110,17 +104,22 @@ void bind_mainthread_CORE(lua_State *L) {
 	// save interval API
 	lua_pushcfunction(L, damage::l_damage_bulk_save_all); lua_setfield(L, core_idx, "native_damage_bulk_save_all");
 
-	// explosions/init.lua  3 poring lua to c++
-	lua_pushcfunction(L, explosions::l_explosions_raycast_sphere);   lua_setfield(L, core_idx, "native_explosions_raycast_sphere");
-	lua_pushcfunction(L, explosions::l_explosions_calculate_damage); lua_setfield(L, core_idx, "native_explosions_calculate_damage");
-	lua_pushcfunction(L, explosions::l_explosions_scorch_nodes);     lua_setfield(L, core_idx, "native_explosions_scorch_nodes");
+	// explosions/init.lua  2 poring lua to c++
+	lua_pushcfunction(L, explosions::l_native_compute_sphere_rays); lua_setfield(L, core_idx, "native_compute_sphere_rays");
+	lua_pushcfunction(L, explosions::l_native_calculate_impact);    lua_setfield(L, core_idx, "native_calculate_impact");
 
-	// liquids/init.lua  3 poring lua to c++
-	lua_pushcfunction(L, liquids::l_liquids_find_flow_direction); lua_setfield(L, core_idx, "native_liquids_find_flow_direction");
-//	lua_pushcfunction(L, liquids::l_liquids_calculate_spread);    lua_setfield(L, core_idx, "native_liquids_calculate_spread");
-//	lua_pushcfunction(L, liquids::l_liquids_bulk_update_nodes);   lua_setfield(L, core_idx, "native_liquids_bulk_update_nodes");
-	// liquids(flowlib)  1 poring lua to c++
-	lua_pushcfunction(L, liquids::l_liquids_quick_flow_native); lua_setfield(L, core_idx, "native_liquids_quick_flow");
+	// flowlib/init.lua  1 poring lua to c++
+	lua_pushcfunction(L, flowlib::l_native_quick_flow);         	lua_setfield(L, core_idx, "native_quick_flow");
+	// mcl_liquids/init.lua  2 poring lua to c++
+	lua_pushcfunction(L, flowlib::l_native_does_sl_need_update);	lua_setfield(L, core_idx, "native_does_sl_need_update");
+	lua_pushcfunction(L, flowlib::l_native_does_fl_need_update);	lua_setfield(L, core_idx, "native_does_fl_need_update");
+
+	// worlds/init.lua  5 poring lua to c++
+	lua_pushcfunction(L, worlds::l_worlds_is_in_void);                 lua_setfield(L, core_idx, "native_worlds_is_in_void");
+	lua_pushcfunction(L, worlds::l_worlds_y_to_layer);                 lua_setfield(L, core_idx, "native_worlds_y_to_layer");
+	lua_pushcfunction(L, worlds::l_worlds_pos_to_dimension);           lua_setfield(L, core_idx, "native_worlds_pos_to_dimension");
+	lua_pushcfunction(L, worlds::l_worlds_layer_to_y);                 lua_setfield(L, core_idx, "native_worlds_layer_to_y");
+	lua_pushcfunction(L, worlds::l_worlds_tick_chunk_inhabited_time); lua_setfield(L, core_idx, "native_worlds_tick_chunk_inhabited_time");
 
 	lua_pop(L, 1); // mcl_util テーブルをお片付け
 }

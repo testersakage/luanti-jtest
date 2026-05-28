@@ -514,7 +514,8 @@ set(common_SRCS
 	mcl/stacktrace.cpp
 	mcl/core/damage.cpp
 	mcl/core/explosions.cpp
-	mcl/core/liquids.cpp
+	mcl/core/flowlib.cpp
+#	mcl/core/liquids.cpp
 	mcl/core/util_compat.cpp
 	mcl/core/util_environment.cpp
 	mcl/core/util_item.cpp
@@ -526,7 +527,6 @@ set(common_SRCS
 	mcl/core/util_table.cpp
 	mcl/core/worlds.cpp
 	mcl/core/tga_encoder.cpp
-#	mcl/core/tga_encoder.h
 #	mcl/entities/mobs.cpp
 	mcl/entities/mobs_combat.cpp
 	mcl/entities/mobs_pathfinding.cpp
