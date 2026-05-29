@@ -12,6 +12,7 @@
 #include "mcl/core/worlds.h"
 #include "mcl/core/tga_encoder.h"
 #include "mcl/entities/burning.h"
+#include "mcl/entities/mobs.h"
 //#include "mcl/entities/mobs.h"
 //#include "mcl/entities/mobs_combat.h"
 //#include "mcl/entities/mobs_pathfinding.h"
@@ -108,6 +109,10 @@ void bind_mainthread_ENTITIES(lua_State *L) {
 
 	// ENTITIES/mcl_burning/init.lua + api.lua
 	lua_pushcfunction(L, burning::l_native_check_burning_environment);		lua_setfield(L, ent_idx, "native_check_burning_environment");
+
+	// ENTITIES/mcl_mobs/api.lua
+	lua_pushcfunction(L, mobs::l_native_update_mob_timers);			lua_setfield(L, ent_idx, "native_update_mob_timers");
+	lua_pushcfunction(L, mobs::l_native_mob_environment_scan);		lua_setfield(L, ent_idx, "native_mob_environment_scan");
 /*
 	// ENTITIES/mcl_mobs/init.lua
 	lua_pushcfunction(L, entities::l_mobs_register_villager_native); lua_setfield(L, ent_idx, "native_register_villager");

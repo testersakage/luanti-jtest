@@ -13,11 +13,18 @@
 * 生ポインタの隔離保護: 空間メタデータ（MetaDataRef）やインベントリの生ポインタ操作など、非同期境界で切断リスクのある実務はLua側にホールドさせ、C++側は純粋な幾何学・算術計算・文字列トリミングに特化させる。
 
 ------------------------------
-## 2. 開通APIマトリクス (1 APIs Registered)
+## 2. 開通APIマトリクス (3 APIs Registered)
 
 ### `mcl_burning` (ENTITIES宇宙・炎上消火環境一斉スキャン)
 * **`mclcapi.native_check_burning_environment(pos, minp, maxp)`**
   * **実務**: 毎フレーム、オンライン上の全プレイヤーの足元および全身の衝突箱（Collisionbox）の3次元空間をC++側から `core.get_node_raw` を用いて一斉走査。
   * **Symmetry対応**: 走査データに対して、消火属性（`group:puts_out_fire`）および炎上属性（`group:set_on_fire`）の2大グループ検品をC++レジスタ内で一撃統合評価し、消火フラグと最大炎上時間をLua側へ最速スピード返却。個体数がバーストした際のメインスレッドの窒息（ガベージコレクション）を完全根絶。
+
+### `mcl_mobs` (ENTITIES宇宙・Mob共通AIステップ・タイマー制御)
+* **`mclcapi.native_update_mob_timers(self, dtime)`**
+  * **実務**: 毎フレーム全個体（1秒あたり千数百回バースト）にある全AIタイマー（索敵、アニメーション等）の残り時間をC++連続メモリ内で一括減算。
+* **`mclcapi.native_mob_environment_scan(feet, pos_head)`**
+  * **実務**: 個体の足元2面、頭部1面の計3マスの空間ノードをC++側から `core.get_node_raw` を用いて一発回収。
+  * **Symmetry対応**: 毎フレーム発生していた `pairs` ループによる空テーブルの新規浪費、および文字列ノード名の多重パースコストを完全更地化。メインスレッドの脈拍をフラットにホールドし、乱戦時のヒット判定ラグを根絶。
 
 ------------------------------

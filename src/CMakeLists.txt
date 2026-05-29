@@ -528,7 +528,7 @@ set(common_SRCS
 	mcl/core/worlds.cpp
 	mcl/core/tga_encoder.cpp
 	mcl/entities/burning.cpp
-#	mcl/entities/mobs.cpp
+	mcl/entities/mobs.cpp
 #	mcl/entities/mobs_combat.cpp
 #	mcl/entities/mobs_pathfinding.cpp
 )

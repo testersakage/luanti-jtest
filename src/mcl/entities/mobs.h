@@ -2,11 +2,10 @@
 #pragma once
 #include <lua.hpp>
 
-namespace entities {
+namespace mobs {
+	// mcl_mobs/api.lua 由来：全個体独立タイマー一斉高速減算
+	int l_native_update_mob_timers(lua_State *L);
 
-	// 👑 【第4章・3大最速Mob筋肉】：見る以外のスタック操作を一切しない絶対規律API窓口群
-	int l_mobs_register_villager_native(lua_State *L);
-	int l_mobs_check_poi_valid_native(lua_State *L);
-	int l_mobs_filter_trades_native(lua_State *L);
-
+	// mcl_mobs/api.lua 由来：足元・頭部の3面周辺環境ノード一括高速スキャン
+	int l_native_mob_environment_scan(lua_State *L);
 }
