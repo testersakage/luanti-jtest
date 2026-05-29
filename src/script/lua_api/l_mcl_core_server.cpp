@@ -11,6 +11,7 @@
 #include "mcl/core/util_table.h"
 #include "mcl/core/worlds.h"
 #include "mcl/core/tga_encoder.h"
+#include "mcl/entities/burning.h"
 //#include "mcl/entities/mobs.h"
 //#include "mcl/entities/mobs_combat.h"
 //#include "mcl/entities/mobs_pathfinding.h"
@@ -104,7 +105,7 @@ void bind_mainthread_CORE(lua_State *L) {
 }
 
 void bind_mainthread_ENTITIES(lua_State *L) {
-/*
+
 	lua_getglobal(L, "mclcapi");
 	if (!lua_istable(L, -1)) {
 		lua_pop(L, 1);
@@ -114,6 +115,9 @@ void bind_mainthread_ENTITIES(lua_State *L) {
 	}
 	int ent_idx = lua_gettop(L); // 基準となるテーブルの部屋番号を固定
 
+	// ENTITIES/mcl_burning/init.lua + api.lua
+	lua_pushcfunction(L, burning::l_native_check_burning_environment);		lua_setfield(L, ent_idx, "native_check_burning_environment");
+/*
 	// ENTITIES/mcl_mobs/init.lua
 	lua_pushcfunction(L, entities::l_mobs_register_villager_native); lua_setfield(L, ent_idx, "native_register_villager");
 	lua_pushcfunction(L, entities::l_mobs_check_poi_valid_native);   lua_setfield(L, ent_idx, "native_check_poi_valid");
