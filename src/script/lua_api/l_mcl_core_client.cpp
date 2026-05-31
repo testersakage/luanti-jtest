@@ -113,6 +113,9 @@ void bind_mainthread_ENTITIES(lua_State *L) {
 	// ENTITIES/mcl_mobs/api.lua
 	lua_pushcfunction(L, mobs::l_native_update_mob_timers);			lua_setfield(L, ent_idx, "native_update_mob_timers");
 	lua_pushcfunction(L, mobs::l_native_mob_environment_scan);		lua_setfield(L, ent_idx, "native_mob_environment_scan");
+	// ENTITIES/mcl_mobs/pathfinder.lua
+	lua_pushcfunction(L, mobs::l_native_gwp_compute_path);			lua_setfield(L, ent_idx, "native_gwp_compute_path");
+
 /*
 	// ENTITIES/mcl_mobs/init.lua
 	lua_pushcfunction(L, entities::l_mobs_register_villager_native); lua_setfield(L, ent_idx, "native_register_villager");
