@@ -512,6 +512,8 @@ set(common_SRCS
 	${server_network_SRCS}
 	utf8_53.cpp
 	mcl/stacktrace.cpp
+	mcl/math_common.cpp
+	mcl/spatial_common.cpp
 	mcl/core/damage.cpp
 	mcl/core/explosions.cpp
 	mcl/core/flowlib.cpp
