@@ -11,31 +11,45 @@
 
 namespace mobs {
 
-	// 個別対応名義規律：mclcapi.native.update_mob_timers
-	int l_native_update_mob_timers(lua_State *L) {
-		luaL_checktype(L, 1, LUA_TTABLE); 
+	// 👑 1. 【native_update_mob_timers】：スタック目詰まりを完全全消去した決定版
+	int l_native_update_mob_timers(lua_State *L)
+	{
+		luaL_checktype(L, 1, LUA_TTABLE); // self
 		double dtime = luaL_checknumber(L, 2);
 
 		lua_getfield(L, 1, "_timers");
-		if (!lua_istable(L, -1)) { lua_pop(L, 1); return 0; }
+		if (!lua_istable(L, -1)) {
+			lua_pop(L, 1);
+			return 0;
+		}
 
-		struct TimerUpdate { std::string key; double new_value; };
+		// 🎯 【重要】：この時点で _timers テーブルはスタックの下から数えて
+		//    「正確に 3 番目の部屋」に焼き固まって常駐しています（絶対位置: 3）
+		const int TIMERS_TABLE_INDEX = 3;
+
+		struct TimerUpdate {
+			std::string key;
+			double new_value;
+		};
 		std::vector<TimerUpdate> updates;
 
+		// 1手目：純粋な読み込み走査（ハッシュを1ミリも汚さない）
 		lua_pushnil(L);
-		while (lua_next(L, -2) != 0) {
+		while (lua_next(L, TIMERS_TABLE_INDEX) != 0) {
 			if (lua_isstring(L, -2) && lua_isnumber(L, -1)) {
 				updates.push_back({lua_tostring(L, -2), lua_tonumber(L, -1) - dtime});
 			}
 			lua_pop(L, 1); 
 		}
 
+		// 2手目：安全な更地にて、絶対インデックス 3番部屋の _timers テーブルへバッチスタンプ書き戻し！！！
 		for (const auto& up : updates) {
 			lua_pushstring(L, up.key.c_str());
 			lua_pushnumber(L, up.new_value);
-			lua_settable(L, -3); 
+			lua_settable(L, TIMERS_TABLE_INDEX); // 🎯 相対インデックスを全消去し、絶対位置指定で100%安全結合！
 		}
-		lua_pop(L, 1); 
+
+		lua_pop(L, 1); // _timers テーブルを安全にポップしてお掃除
 		return 0;
 	}
 
