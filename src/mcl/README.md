@@ -1,30 +1,50 @@
 ------------------------------
 ## Luanti C++ Native API Infrastructure Specification (dev4mcl)
-本ディレクトリは、Mineclonia v0.120.0以降（Luanti 5.15.2以降）の中枢演算およびマルチスレッド環境下におけるボトルネックを高速化・安定化するために実装された、ネイティブC++ API群の実体仕様書である。
-## 1. 共通設計規律 (Core Infrastructure Rules)
-
-* 実名常駐・動的内部リレー規律: Lua側のグローバル関数名義およびオブジェクトメソッドは0手目（Modロード時）から100%存在保証（実名常駐）させ、実行時C++窓口（mclcapi）の有無を検知して動的にフォールバックを切り替える。非同期（Emerge-0等）での nil 即死を回避する。
-* 引数直撃一本釣り規律: C++窓口での無駄なスタック走査や型検品ループを排除し、固定されたインデックス位置から luaL_check... を用いて最速でデータを回収する。
-* 生ポインタの隔離保護: 空間メタデータ（MetaDataRef）やインベントリの生ポインタ操作など、非同期境界で切断リスクのある実務はLua側にホールドさせ、C++側は純粋な幾何学・算術計算・文字列トリミングに特化させる。
-
+本ディレクトリは、Mineclonia v0.120.0以降（Luanti 5.15.2以降）の高負荷処理を高速化するためにC++ APIを追加する試みです。
+## 1. 基本設計
+* c++側: 以下の4大数理計算とそれに付随する処理をC++側にAPIとして実装します。
+  1. 3次元の多重走査（3重ループ）
+  2. グループ属性検品
+  3. ビットパック・数値算術
+  4. 文字列トリミング
+* lua側: 高速化対象の関数にC++ APIへの引数の前処理と分岐を追加し、従来の処理をフォールバックとして利用する改造を行う。
 ------------------------------
-## 2. 開通APIマトリクス
-
+## 2. C++ APIマトリクス
 各ページを参照
-* [CORE](API_CORE.md)
-* [ENTITIES](API_ENTITIES.md)
+* mineclonia/mods/
+  * [CORE/](API_CORE.md)
+  * [ENTITIES/](API_ENTITIES.md)
 ------------------------------
-## 3. コンパイルおよび配線手順 (Build & Binding)
-## C++側のビルド追加 (src/CMakeLists.txt)
-
-mcl/core/util_shape.cpp
-mcl/core/explosions.cpp
-mcl/core/flowlib.cpp
-mcl/core/damage.cpp# (他、各コアモジュールの.cppをここに集約)
-
-## 窓口一括結線 (src/script/lua_api/l_mcl_core_server.cpp)
-bind_multithread_CORE 内で各 namespace の関数ポインタを mclcapi テーブルへフィールド展開する。
-
+## ファイル配置
+- src/
+  - script/
+    - cpp_api/
+      - s_async.cpp - Emerge-0 スレッド登録用  
+      - s_mapgen.cpp - mapgen スレッド登録用  
+    - lua_api/
+      - l_mcl_client.cpp - Main スレッド登録用(Client)
+      - l_mcl_server.cpp - Main スレッド登録用(Server)
+  - mcl/
+    - CORE/
+      - flowlib.cpp  
+      - damage.cpp  
+      - explosions.cpp  
+      - util_environment.cpp  
+      - util_item.cpp
+      - util_misc.cpp
+      - util_object.cpp
+      - util_shape.cpp
+      - util_table.cpp
+      - liquids.cpp  
+      - worlds.cpp  
+      - tga_encoder.cpp  
+    - ENTITIES/
+      - burning.cpp
+      - mobs.cpp
+    - math_common.cpp - ビットパック・数値算術、文字列トリミング
+    - spatial_common.cpp - 3次元多重走査、グループ属性検品
+##  開発環境
+Windows10 pro + MSYS2 CLANG64 で開発しています。
 ## Mineclonia側の変更
 こちらのブランチにあります。
 https://github.com/testersakage/mineclonia-jtest/tree/dev4cpp/mods
