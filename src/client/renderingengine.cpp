@@ -25,6 +25,10 @@
 #include "irrlicht_changes/static_text.h"
 #include "irr_ptr.h"
 
+#if FIX_IME
+#include <SDL2/SDL.h>
+#endif
+
 RenderingEngine *RenderingEngine::s_singleton = nullptr;
 
 /* Helper classes */
@@ -369,6 +373,18 @@ void RenderingEngine::draw_load_screen(const std::wstring &text,
 	guienv->drawAll();
 	driver->endScene();
 	guitext->remove();
+
+#if FIX_IME
+	// --- IME位置リセットパッチここから ---
+	SDL_Rect imefix_rect;
+	imefix_rect.x = screensize.X / 2;
+	imefix_rect.y = screensize.Y - (screensize.Y / 6); // 画面下部（通常のチャット欄付近）へダミー座標を仮設定
+	imefix_rect.w = 100;
+	imefix_rect.h = 20;
+	SDL_SetTextInputRect(&imefix_rect);
+	// --- IME位置リセットパッチここまで ---
+#endif
+
 }
 
 std::vector<video::E_DRIVER_TYPE> RenderingEngine::getSupportedVideoDrivers()

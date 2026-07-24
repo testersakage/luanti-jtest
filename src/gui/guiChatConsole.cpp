@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 // Copyright (C) 2013 celeron55, Perttu Ahola <celeron55@gmail.com>
 
+// compile switch
+//#ifndef FIX_IME
+//    #define FIX_IME 1
+//#endif
+
 #include "guiChatConsole.h"
 #include "chat.h"
 #include "client/client.h"
@@ -17,6 +22,10 @@
 #include "guiScrollBar.h"
 #include <IOSOperator.h>
 #include <string>
+
+#if FIX_IME
+#include <SDL2/SDL.h>
+#endif
 
 inline u32 clamp_u8(s32 value)
 {
@@ -411,6 +420,26 @@ void GUIChatConsole::drawPrompt()
 		}
 	}
 
+#if FIX_IME
+	// --- IME位置修正パッチここから ---
+	s32 cursor_pos = prompt.getVisibleCursorPosition();
+	if (cursor_pos >= 0) {
+		u32 text_to_cursor_pos_width = m_font->getDimension(prompt_text.substr(0, cursor_pos).c_str()).Width;
+		s32 cursor_x = font_width + text_to_cursor_pos_width;
+		
+		core::rect<s32> element_rect = getAbsolutePosition();
+		
+		SDL_Rect sdl_rect;
+		sdl_rect.x = element_rect.UpperLeftCorner.X + cursor_x;
+		sdl_rect.y = element_rect.UpperLeftCorner.Y + y;
+		sdl_rect.w = font_width;
+		sdl_rect.h = font_height;
+
+		// RenderingEngine は使わず、SDL2 の API を直接呼び出します
+		SDL_SetTextInputRect(&sdl_rect);
+	}
+	// --- IME位置修正パッチここまで ---
+#endif
 }
 
 bool GUIChatConsole::OnEvent(const SEvent& event)

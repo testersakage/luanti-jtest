@@ -1,3 +1,12 @@
+# --- IME FIX Options ---
+option(ENABLE_FIX_WINIME "Enable FIX WINDOWS IME bug (Windows)" ON)
+
+if(ENABLE_FIX_WINIME)
+    add_definitions(-DFIX_IME=1)
+else()
+    add_definitions(-DFIX_IME=0)
+endif()
+
 # --- UTF8Sign Engine Options ---
 option(ENABLE_UTF8_ATLAS "Enable Standard Atlas (Irrlicht)" OFF)
 option(ENABLE_UTF8_SDL2_ATLAS "Enable Extended Atlas (SDL2)" ON)
