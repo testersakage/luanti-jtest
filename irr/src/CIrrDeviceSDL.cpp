@@ -352,6 +352,7 @@ Keycode CIrrDeviceSDL::getKeyFromScancode(const u32 scancode) const
 	return Keycode(irrcode, keychar);
 }
 
+/*
 void CIrrDeviceSDL::resetReceiveTextInputEvents()
 {
 	gui::IGUIElement *elem = GUIEnvironment->getFocus();
@@ -373,6 +374,112 @@ void CIrrDeviceSDL::resetReceiveTextInputEvents()
 #else
 			SDL_SetTextInputRect(&rect);
 #endif
+			SDL_StartTextInput(Window);
+		}
+	} else {
+		SDL_StopTextInput(Window);
+	}
+}
+*/
+
+void CIrrDeviceSDL::resetReceiveTextInputEvents()
+{
+	gui::IGUIElement *elem = GUIEnvironment->getFocus();
+	
+	// --- パッチ：すべてのFormspec（クリエイティブ・看板等）への完全割り込み ---
+	if (elem && !elem->acceptsIME()) {
+		const auto& children = elem->getChildren();
+		for (auto* child : children) {
+			if (child && child->acceptsIME()) {
+				elem = child;
+				break;
+			}
+			if (child) {
+				const auto& grand_children = child->getChildren();
+				for (auto* g_child : grand_children) {
+					if (g_child && g_child->acceptsIME()) {
+						elem = g_child;
+						break;
+					}
+				}
+				if (elem && elem->acceptsIME()) break;
+			}
+		}
+	}
+	// -----------------------------------------------------------------
+
+	if (elem && elem->acceptsIME()) {
+		// IBus seems to have an issue where dead keys and compose keys do not
+		// work (specifically, the individual characters in the sequence are
+		// sent as text input events instead of the result) when
+		// SDL_StartTextInput() is called on the same input box.
+		core::rect<s32> pos = elem->getAbsolutePosition();
+		
+		if (!SDL_TextInputActive(Window) || true) { 
+			lastElemPos = pos;
+			SDL_Rect rect;
+
+			// --- IME中央寄せ＆親ウィンドウ位置完全同期システム ---
+			int w_window = 1, h_window = 1;
+			int w_render = 1, h_render = 1;
+			SDL_GetWindowSize(Window, &w_window, &h_window);
+			SDL_GL_GetDrawableSize(Window, &w_render, &h_render);
+
+			float scale_x = (float)w_render / (float)w_window;
+			float scale_y = (float)h_render / (float)h_window;
+
+			s32 absolute_x = pos.UpperLeftCorner.X;
+			s32 absolute_y = pos.UpperLeftCorner.Y;
+
+			// 最も外側にある親要素（Formspec全体のメイン背景ウィンドウ）まで遡る
+			gui::IGUIElement *parent = elem->getParent();
+			gui::IGUIElement *last_valid_parent = nullptr;
+
+			while (parent && parent != GUIEnvironment->getRootGUIElement()) {
+				last_valid_parent = parent;
+				parent = parent->getParent();
+			}
+
+			if (last_valid_parent) {
+				core::rect<s32> p_abs = last_valid_parent->getAbsolutePosition();
+				
+				if (p_abs.UpperLeftCorner.X > 0 || p_abs.UpperLeftCorner.Y > 0) {
+					absolute_x = p_abs.UpperLeftCorner.X + elem->getRelativePosition().UpperLeftCorner.X;
+					absolute_y = p_abs.UpperLeftCorner.Y + elem->getRelativePosition().UpperLeftCorner.Y;
+				}
+			}
+
+			// 完全に補正されたウィンドウピクセル位置にスケーリング倍率を乗算
+			rect.x = (int)(absolute_x * scale_x);
+			rect.y = (int)(absolute_y * scale_y);
+			rect.w = (int)(pos.getWidth() * scale_x);
+			rect.h = (int)(pos.getHeight() * scale_y);
+
+			// --- 【残像防止処理】 ---
+			// 画面が開いた瞬間、計算が追いつくまでの「最初の数フレーム」だけ
+			// 前回の古い座標が送られるのを完全に防ぎます。
+			static gui::IGUIElement* prev_elem = nullptr;
+			static int skip_frames = 0;
+			if (elem != prev_elem) {
+				prev_elem = elem;
+				skip_frames = 5; // 画面が安定するまで最初の5フレームだけ座標の送信をスキップ
+			}
+
+			if (skip_frames > 0) {
+				skip_frames--;
+				// スキップ中は前回の位置をOS側から一度消去して真っ白な状態にする
+				SDL_Rect zero_rect = {0, 0, 0, 0};
+				SDL_SetTextInputRect(&zero_rect);
+			} else {
+				// 画面が安定したら、完全に計算された正しい最新座標を送り始める
+#ifdef _IRR_USE_SDL3_
+				SDL_SetTextInputArea(Window, &rect, 10);
+#else
+				SDL_SetTextInputRect(&rect);
+#endif
+			}
+			// ------------------------
+
 			SDL_StartTextInput(Window);
 		}
 	} else {
