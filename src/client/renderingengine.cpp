@@ -375,14 +375,21 @@ void RenderingEngine::draw_load_screen(const std::wstring &text,
 	guitext->remove();
 
 #if FIX_IME
-	// --- IME位置リセットパッチここから ---
+	// --- クロスプラットフォーム対応・IME位置リセットパッチ ---
+	#if defined(_WIN32)
+	// Windowsは座標が迷子になりやすいため、画面下部へ強制退避
 	SDL_Rect imefix_rect;
 	imefix_rect.x = screensize.X / 2;
-	imefix_rect.y = screensize.Y - (screensize.Y / 6); // 画面下部（通常のチャット欄付近）へダミー座標を仮設定
+	imefix_rect.y = screensize.Y - (screensize.Y / 6);
 	imefix_rect.w = 100;
 	imefix_rect.h = 20;
 	SDL_SetTextInputRect(&imefix_rect);
-	// --- IME位置リセットパッチここまで ---
+	#elif defined(__linux__)
+	// Linux (X11/Wayland) は安全のため、セッションを壊さないよう現在の画面サイズ情報のみを同期
+	SDL_Rect imefix_rect = {0, 0, (int)screensize.X, (int)screensize.Y};
+	SDL_SetTextInputRect(&imefix_rect);
+	#endif
+	// -----------------------------------------------------
 #endif
 
 }
