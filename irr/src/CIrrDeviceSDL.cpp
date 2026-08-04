@@ -1122,6 +1122,27 @@ bool CIrrDeviceSDL::run()
 			irrevent.EventType = EET_STRING_INPUT_EVENT;
 			irrevent.StringInput.Str = new core::stringw();
 			core::utf8ToWString(*irrevent.StringInput.Str, SDL_event.text.text);
+
+#if defined(_WIN32)
+			// --- パッチ：Windows IME文字化け一括修正システム（反転修正版） ---
+			// WindowsのIMEが送ってくる不格好なコード（U+FF5Eなど）を検知し、
+			// Luanti標準フォントが「最も綺麗な全角グリフ」を持っている正しいコードへと変換します。
+			if (irrevent.StringInput.Str) {
+				for (u32 i = 0; i < irrevent.StringInput.Str->size(); ++i) {
+					wchar_t ch = (*irrevent.StringInput.Str)[i];
+					switch (ch) {
+						case 0xFF5E: (*irrevent.StringInput.Str)[i] = 0x301C; break; // ～ (Windowsの全角チルダ U+FF5E -> 綺麗な全角波ダッシュ U+301C へ変換)
+						case 0xFF02: (*irrevent.StringInput.Str)[i] = 0x2225; break; // ∥ (双対符の補正)
+						case 0xFF0D: (*irrevent.StringInput.Str)[i] = 0x2212; break; // － (全角マイナスの補正)
+						case 0xFFE0: (*irrevent.StringInput.Str)[i] = 0x00A2; break; // ￠ (セント記号の補正)
+						case 0xFFE1: (*irrevent.StringInput.Str)[i] = 0x00A3; break; // ￡ (ポンド記号の補正)
+						case 0xFFE2: (*irrevent.StringInput.Str)[i] = 0x00AC; break; // ￢ (否定ノットの補正)
+					}
+				}
+			}
+			// --------------------------------------------------
+#endif
+
 			postEventFromUser(irrevent);
 			delete irrevent.StringInput.Str;
 			irrevent.StringInput.Str = NULL;
