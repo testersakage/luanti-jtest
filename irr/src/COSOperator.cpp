@@ -3,6 +3,8 @@
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
 #include "COSOperator.h"
+#include <vector>
+#include <string>
 
 #ifdef _IRR_WINDOWS_API_
 #include <windows.h>
@@ -72,6 +74,7 @@ const c8 *COSOperator::getTextFromClipboard() const
 	ClipboardSelectionText = SDL_GetClipboardText();
 
 #if defined(_WIN32)
+/*
 	// --- パッチ：コピペ時のWindows IME文字化け一括修正（UTF-8版） ---
 	// クリップボードから貼り付け（Ctrl+V）された生のUTF-8文字列をスキャンし、
 	// 不格好な記号を、Luanti標準フォントが綺麗に全角描画できる正しいコードへ置換します。
@@ -108,6 +111,27 @@ const c8 *COSOperator::getTextFromClipboard() const
 		}
 	}
 	// -----------------------------------------------------------------
+*/
+	// Windows環境かつJSONデータが存在する場合のみUTF-8置換を実行
+	extern std::vector<std::pair<std::string, std::string>> g_win_clipboard_paste_vector;
+	if (ClipboardSelectionText && !g_win_clipboard_paste_vector.empty()) {
+		std::string str(ClipboardSelectionText);
+		bool changed = false;
+
+		for (const auto& replacement : g_win_clipboard_paste_vector) {
+			size_t pos = 0;
+			while ((pos = str.find(replacement.first, pos)) != std::string::npos) {
+				str.replace(pos, replacement.first.length(), replacement.second);
+				pos += replacement.second.length();
+				changed = true;
+			}
+		}
+
+		if (changed) {
+			SDL_free(ClipboardSelectionText);
+			ClipboardSelectionText = SDL_strdup(str.c_str());
+		}
+	}
 #endif
 
 	return ClipboardSelectionText;

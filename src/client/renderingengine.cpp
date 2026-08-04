@@ -29,6 +29,14 @@
 #include <SDL2/SDL.h>
 #endif
 
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <fstream>
+#include "json/json.h"
+#include "log.h"       // Luantiの公式ログ（infostream等）を使用するため
+#include "settings.h"  // g_settings を使用するため
+
 RenderingEngine *RenderingEngine::s_singleton = nullptr;
 
 /* Helper classes */
@@ -414,8 +422,14 @@ std::vector<video::E_DRIVER_TYPE> RenderingEngine::getSupportedVideoDrivers()
 	return drivers;
 }
 
+#if defined(_WIN32)
+void loadWindowsCharReplaceJson(); // 関数の存在を事前に知らせる宣言
+#endif
 void RenderingEngine::initialize(Client *client, Hud *hud)
 {
+#if defined(_WIN32)
+	loadWindowsCharReplaceJson(); // 関数
+#endif
 	const std::string &draw_mode = g_settings->get("3d_mode");
 	core.reset(createRenderingCore(draw_mode, m_device, client, hud));
 }
@@ -486,3 +500,69 @@ void RenderingEngine::autosaveScreensizeAndCo(
 	if (is_window_maximized != initial_window_maximized)
 		g_settings->setBool("window_maximized", is_window_maximized);
 }
+
+#if defined(_WIN32)
+// 下層のIrrlicht側（C++）から超高速に参照するためのグローバルテーブル
+std::unordered_map<wchar_t, wchar_t> g_win_direct_input_map;
+std::vector<std::pair<std::string, std::string>> g_win_clipboard_paste_vector;
+
+// 16進数文字列（"FF5E" 等）を数値やUTF-8バイトに変換するヘルパー
+std::string hexStringToBytes(const std::string& hex) {
+	std::string bytes;
+	for (size_t i = 0; i < hex.length(); i += 2) {
+		std::string byteString = hex.substr(i, 2);
+		char byte = (char)std::stoul(byteString, nullptr, 16);
+		bytes.push_back(byte);
+	}
+	return bytes;
+}
+
+void loadWindowsCharReplaceJson()
+{
+	// 1. minetest.conf から設定項目を取得
+	if (!g_settings->exists("windows_char_replace")) {
+		infostream << "[WindowsCharReplace] Setting 'windows_char_replace' not found in minetest.conf. Using default behavior." << std::endl;
+		return;
+	}
+
+	std::string filename = g_settings->get("windows_char_replace");
+	infostream << "[WindowsCharReplace] Found configuration item. Trying to load: " << filename << std::endl;
+
+	std::ifstream file(filename);
+	if (!file.is_open()) {
+		errorstream << "[WindowsCharReplace] Failed to open specified JSON file: " << filename << std::endl;
+		return;
+	}
+
+	Json::Value root;
+	Json::Reader reader;
+	if (!reader.parse(file, root)) {
+		errorstream << "[WindowsCharReplace] Failed to parse JSON file (Syntax error): " << filename << std::endl;
+		return;
+	}
+
+	// 2. 直接入力ルールをメモリに常駐
+	if (root.isMember("direct_input")) {
+		const Json::Value& direct = root["direct_input"];
+		for (const auto& key : direct.getMemberNames()) {
+			wchar_t from_ch = (wchar_t)std::stoul(key, nullptr, 16);
+			wchar_t to_ch = (wchar_t)std::stoul(direct[key].asString(), nullptr, 16);
+			g_win_direct_input_map[from_ch] = to_ch;
+		}
+	}
+
+	// 3. コピペルールをメモリに常駐
+	if (root.isMember("clipboard_paste")) {
+		const Json::Value& clipboard = root["clipboard_paste"];
+		for (const auto& key : clipboard.getMemberNames()) {
+			std::string from_str = hexStringToBytes(key);
+			std::string to_str = hexStringToBytes(clipboard[key].asString());
+			g_win_clipboard_paste_vector.push_back({from_str, to_str});
+		}
+	}
+
+	actionstream << "[WindowsCharReplace] Successfully loaded " 
+		<< g_win_direct_input_map.size() << " direct rules and " 
+		<< g_win_clipboard_paste_vector.size() << " clipboard rules from " << filename << std::endl;
+}
+#endif

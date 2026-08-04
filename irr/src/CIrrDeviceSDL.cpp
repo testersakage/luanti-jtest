@@ -1124,6 +1124,7 @@ bool CIrrDeviceSDL::run()
 			core::utf8ToWString(*irrevent.StringInput.Str, SDL_event.text.text);
 
 #if defined(_WIN32)
+/*
 			// --- パッチ：Windows IME文字化け一括修正システム（反転修正版） ---
 			// WindowsのIMEが送ってくる不格好なコード（U+FF5Eなど）を検知し、
 			// Luanti標準フォントが「最も綺麗な全角グリフ」を持っている正しいコードへと変換します。
@@ -1141,6 +1142,18 @@ bool CIrrDeviceSDL::run()
 				}
 			}
 			// --------------------------------------------------
+*/
+			// Windows環境かつJSONデータが存在する場合のみ超高速置換を実行
+			extern std::unordered_map<wchar_t, wchar_t> g_win_direct_input_map;
+			if (irrevent.StringInput.Str && !g_win_direct_input_map.empty()) {
+				for (u32 i = 0; i < irrevent.StringInput.Str->size(); ++i) {
+					wchar_t ch = (*irrevent.StringInput.Str)[i];
+					auto it = g_win_direct_input_map.find(ch);
+					if (it != g_win_direct_input_map.end()) {
+						(*irrevent.StringInput.Str)[i] = it->second;
+					}
+				}
+			}
 #endif
 
 			postEventFromUser(irrevent);
